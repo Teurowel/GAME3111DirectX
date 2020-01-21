@@ -1,6 +1,6 @@
 //***************************************************************************************
-// Shows how to draw a triangle in Direct3D 12.
-// Adding Color
+// Shows how to draw a Octagon using D3D_PRIMITIVE_TOPOLOGY_LINESTRIP.
+//
 //***************************************************************************************
 
 #include "../../Common/d3dApp.h"
@@ -13,7 +13,6 @@ using namespace DirectX::PackedVector;
 struct Vertex
 {
 	XMFLOAT3 Pos;
-	XMFLOAT4 Color;
 };
 
 
@@ -55,8 +54,7 @@ private:
 	ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
 
-	//step 3 add color components
-	std::array<Vertex, 3> vertices;
+	std::array<Vertex, 24> vertices;
 
 };
 
@@ -76,7 +74,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
 		return theApp.Run();
 	}
-	catch (DxException & e)
+	catch (DxException& e)
 	{
 		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
 		return 0;
@@ -86,7 +84,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 TriangleAPP::TriangleAPP(HINSTANCE hInstance)
 	: D3DApp(hInstance)
 {
-	mMainWndCaption = L"Simple Triangle with Color Demo";
+	mMainWndCaption = L"Line Demo";
 }
 
 TriangleAPP::~TriangleAPP()
@@ -165,13 +163,17 @@ void TriangleAPP::Draw(const GameTimer& gt)
 	//notice that "targets" not "target" in case we have few passes, filtering, etc.
 	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, nullptr);
 
+	//ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
+	//mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
 	mCommandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
 
-
+	//step1
 	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+	//mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINESTRIP);
 
 	//there used to a Draw() function where we used to have vertices address as a parameter. PSO took care of this for us. Now we have different PSO for different sets of objects.
 	mCommandList->DrawInstanced((UINT)std::size(vertices), 1, 0, 0);
@@ -240,35 +242,60 @@ void TriangleAPP::BuildShadersAndInputLayout()
 {
 	HRESULT hr = S_OK;
 	//Take a look at HLSL compiler, change the output directory, set it "Vertex shader", pay attention to "main" as an entry point, the version of hlsl...
-	//step6 use our new shaders PS1 and VS1
-	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS1.hlsl", nullptr, "main", "vs_5_1");
-	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS1.hlsl", nullptr, "main", "ps_5_1");
+	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS.hlsl", nullptr, "main", "vs_5_1");
+	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS.hlsl", nullptr, "main", "ps_5_1");
 
 
 	mInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		//step2
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
 void TriangleAPP::BuildTriangleGeometry()
 {
-
-	vertices =
+ vertices =
 	{
+		
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.25f, +0.5f, 0.0f)}),
+		Vertex({ XMFLOAT3(+0.25f, +0.5f, 0.0f) }),
 
-		Vertex({ XMFLOAT3(-0.5f, -0.5f, 0.0f), XMFLOAT4(Colors::Red)}),
-		Vertex({ XMFLOAT3(+0.0f, +0.5f, 0.0f) , XMFLOAT4(Colors::Green) }),
-		Vertex({ XMFLOAT3(+0.5f, -0.5f, 0.0f) , XMFLOAT4(Colors::Blue)}),
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(+0.25f, +0.5f, 0.0f) }),
+		Vertex({ XMFLOAT3(+0.5f, +0.25f, 0.0f) }),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(+0.5f, +0.25f, 0.0f) }),
+		Vertex({ XMFLOAT3(+0.5f, -0.25f, 0.0f) }),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(+0.5f, -0.25f, 0.0f) }),
+		Vertex({ XMFLOAT3(+0.25f, -0.5f, 0.0f)}),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(+0.25f, -0.5f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.25f, -0.5f, 0.0f)}),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.25f, -0.5f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.5f, -0.25f, 0.0f) }),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.5f, -0.25f, 0.0f) }),
+		Vertex({ XMFLOAT3(-0.5f, 0.25f, 0.0f) }),
+
+		Vertex({ XMFLOAT3(0.f, +0.f, 0.0f)}),
+		Vertex({ XMFLOAT3(-0.5f, 0.25f, 0.0f) }),
+		Vertex({ XMFLOAT3(-0.25f, 0.5f, 0.0f) }),
 	};
 
 	const UINT vbBufferSize = (UINT)vertices.size() * sizeof(Vertex);
-	// Note: using upload heaps to transfer static data like vert buffers is not 
-	// recommended. Every time the GPU needs it, the upload heap will be marshalled 
-	// over. Please read up on Default Heap usage. An upload heap is used here for 
-	// code simplicity and because there are very few verts to actually transfer.
+
+   // Note: using upload heaps to transfer static data like vert buffers is not 
+   // recommended. Every time the GPU needs it, the upload heap will be marshalled 
+   // over. Please read up on Default Heap usage. An upload heap is used here for 
+   // code simplicity and because there are very few verts to actually transfer.
 	md3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -279,13 +306,12 @@ void TriangleAPP::BuildTriangleGeometry()
 
 	// Copy the triangle data to the vertex buffer.
 	UINT8* pVertexDataBegin;
-
 	CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-	mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)); //Gets a CPU pointer to the specified subresource in the resource
-	memcpy(pVertexDataBegin, &vertices, sizeof(vertices));  //Copies count bytes from the object pointed to by &vertices to the object pointed to by pVertexDataBegin.
-	mVertexBuffer->Unmap(0, nullptr);   //Invalidates the CPU pointer to the specified subresource in the resource.
+	mVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
+	memcpy(pVertexDataBegin, &vertices, sizeof(vertices));
+	mVertexBuffer->Unmap(0, nullptr);
 
-		//Initialize the vertex buffer view.
+	//Initialize the vertex buffer view.
 	mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
 	mVertexBufferView.StrideInBytes = sizeof(Vertex);
 	mVertexBufferView.SizeInBytes = vbBufferSize;
@@ -319,8 +345,10 @@ void TriangleAPP::BuildPSO()
 	psoDesc.DepthStencilState.DepthEnable = FALSE;
 	psoDesc.DepthStencilState.StencilEnable = FALSE;
 	psoDesc.SampleMask = UINT_MAX;
+	//step2
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
+	//psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+	//
 	psoDesc.NumRenderTargets = 1;
 	psoDesc.RTVFormats[0] = mBackBufferFormat;  //DXGI_FORMAT_R8G8B8A8_UNORM;
 	psoDesc.SampleDesc.Count = 1;

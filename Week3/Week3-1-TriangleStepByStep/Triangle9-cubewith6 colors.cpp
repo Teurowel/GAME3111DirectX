@@ -1,5 +1,6 @@
 //***************************************************************************************
-// This is a 3D course - no more triangles - let's draw a box now
+// Cube with different face colors
+//In this demo, we are adding another constant buffers to send the colors to the shader
 //***************************************************************************************
 
 #include "../../Common/d3dApp.h"
@@ -14,7 +15,7 @@ using namespace DirectX::PackedVector;
 struct Vertex
 {
 	XMFLOAT3 Pos;
-	XMFLOAT4 Color;
+	//XMFLOAT4 Color;
 };
 
 
@@ -23,6 +24,28 @@ struct ObjectConstants
 	XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
 };
 
+
+struct ObjectConstant2
+{
+	struct {
+		float r;
+		float g;
+		float b;
+		float a;
+	} face_colors[6];
+};
+
+const ObjectConstant2 cb2 =
+{
+	{
+		{1.0f, 0.0f, 1.0f, 1.0f },
+		{0.0f, 1.0f, 0.0f, 1.0f },
+		{0.0f, 0.0f, 1.0f , 1.0f},
+		{1.0f, 1.0f, 1.0f , 1.0f },
+		{0.0f, 1.0f, 1.0f , 1.0f},
+		{1.0f, 0.0f, 1.0f, 1.0f }
+	}
+};
 
 class BoxApp : public D3DApp
 {
@@ -60,6 +83,7 @@ private:
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
 	ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
 	std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
+	std::unique_ptr<UploadBuffer<ObjectConstant2>> mObjectCB2 = nullptr;
 
 	//The ID3DBlob interface is used to return data of arbitrary length. It's contained in D3dcompiler.lib 
 	ComPtr<ID3DBlob> mvsByteCode = nullptr;
@@ -108,7 +132,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 BoxApp::BoxApp(HINSTANCE hInstance)
 	: D3DApp(hInstance)
 {
-	mMainWndCaption = L"Box Demo";
+	mMainWndCaption = L"Cube with difference face colors Demo ";
 }
 
 BoxApp::~BoxApp()
@@ -147,8 +171,8 @@ void BoxApp::OnResize()
 {
 	D3DApp::OnResize();
 
-		// The window resized, so update the aspect ratio and recompute the projection matrix.
-	//step3: change FOV angle to 45 degree
+	// The window resized, so update the aspect ratio and recompute the projection matrix.
+//step3: change FOV angle to 45 degree
 	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 	XMStoreFloat4x4(&mProj, P);
 }
@@ -186,6 +210,12 @@ void BoxApp::Update(const GameTimer& gt)
 	XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
 	mObjectCB->CopyData(0, objConstants);
 
+
+
+	//hooman: don't forget to upload your color data
+
+	mObjectCB2->CopyData(0, cb2);
+
 }
 
 void BoxApp::Draw(const GameTimer& gt)
@@ -218,6 +248,13 @@ void BoxApp::Draw(const GameTimer& gt)
 	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+	//hooman: 
+	int FaceColorCbvIndex = 0;
+	auto FaceColorCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+	FaceColorCbvHandle.Offset(FaceColorCbvIndex, mCbvSrvUavDescriptorSize);
+	mCommandList->SetGraphicsRootDescriptorTable(1, FaceColorCbvHandle);
+	//
 
 	mCommandList->IASetVertexBuffers(0, 1, &mBoxGeo->VertexBufferView());
 	mCommandList->IASetIndexBuffer(&mBoxGeo->IndexBufferView());   //bind it to the pipeline
@@ -257,7 +294,7 @@ void BoxApp::Draw(const GameTimer& gt)
 
 void BoxApp::BuildRootSignature()
 {
- 
+
 	// Shader programs typically require resources as input (constant buffers,
 	// textures, samplers).  The root signature defines the resources the shader
 	// programs expect.  If we think of the shader programs as a function, and
@@ -265,16 +302,23 @@ void BoxApp::BuildRootSignature()
 	// thought of as defining the function signature.  
 
 	// Root parameter can be a table, root descriptor or root constants.
-	CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+	//Hooman: we can add two ranges with two parameters
+	CD3DX12_DESCRIPTOR_RANGE cbvTable[2] = {};
+	cbvTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	cbvTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 
-	// Create a single descriptor table of CBVs.
-	CD3DX12_DESCRIPTOR_RANGE cbvTable;
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+	// Root parameter can be a table, root descriptor or root constants.
+	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+
+	// Create root CBVs.
+	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable[0]);
+	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable[1]);
+
 
 	// A root signature is an array of root parameters.
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter, 0, nullptr,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
 
 
 	// create a root signature with no slot for now!
@@ -303,13 +347,13 @@ void BoxApp::BuildShadersAndInputLayout()
 	//when you are adding new shader, make sure you right click, and set shader type and shader model in HLSL compiler 
 	//step3: refactoring the vertex shader to use structs for both ins and outs parameters
 	//note that I changed "main" to PS and VS
-	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS3.hlsl", nullptr, "VS", "vs_5_1");
-	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS3.hlsl", nullptr, "PS", "ps_5_1");
+	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS4.hlsl", nullptr, "VS", "vs_5_1");
+	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS4.hlsl", nullptr, "PS", "ps_5_1");
 
 	mInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		/*{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },*/
 	};
 }
 
@@ -318,14 +362,23 @@ void BoxApp::BuildTriangleGeometry()
 	//step1
 	std::array<Vertex, 8> vertices =
 	{
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
+		//Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
+		//Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
+		//Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
+		//Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
+		//Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
+		//Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
+		//Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
+		//Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
+
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f) }),
+		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f) }),
+		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f) }),
+		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f) }),
+		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f) })
 	};
 
 	std::array<std::uint16_t, 36> indices =
@@ -428,32 +481,59 @@ void BoxApp::BuildPSO()
 void BoxApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-	cbvHeapDesc.NumDescriptors = 1;
+	cbvHeapDesc.NumDescriptors = 2; 
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	cbvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvHeapDesc,
-		IID_PPV_ARGS(&mCbvHeap)));
+	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&mCbvHeap)));
+	mCbvHeap->SetName(L"Constant Buffer View Descriptor Heap");
 }
 
 void BoxApp::BuildConstantBuffers()
 {
-	mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), 1, true);
 
-	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
-	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
-	// Offset to the ith object constant buffer in the buffer.
-	int boxCBufIndex = 0;
-	cbAddress += boxCBufIndex * objCBByteSize;
 
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-	cbvDesc.BufferLocation = cbAddress;
-	cbvDesc.SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
-	md3dDevice->CreateConstantBufferView(
-		&cbvDesc,
-		mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc[2] = {};
+
+		mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), 1, true);
+
+		UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+
+		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
+		// Offset to the ith object constant buffer in the buffer.
+		int boxCBufIndex = 0;
+		cbAddress += boxCBufIndex * objCBByteSize;
+
+
+		cbvDesc[0].BufferLocation = cbAddress;
+		cbvDesc[0].SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+
+
+
+		mObjectCB2 = std::make_unique<UploadBuffer<ObjectConstant2>>(md3dDevice.Get(), 1, true);
+
+		UINT objCB2ByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstant2));
+
+		D3D12_GPU_VIRTUAL_ADDRESS cb2Address = mObjectCB2->Resource()->GetGPUVirtualAddress();
+		// Offset to the ith object constant buffer in the buffer.
+		int mFaceColorCbvOffset = 0;
+		cb2Address += mFaceColorCbvOffset * objCB2ByteSize;
+
+		// Offset to the facecolor cbv in the descriptor heap.
+
+
+		cbvDesc[1].BufferLocation = cb2Address;
+		cbvDesc[1].SizeInBytes = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstant2));
+
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle0(mCbvHeap->GetCPUDescriptorHandleForHeapStart(), 0, 0);
+		md3dDevice->CreateConstantBufferView(&cbvDesc[0], cbvHandle0);
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle1(mCbvHeap->GetCPUDescriptorHandleForHeapStart(), md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV), 1);
+		md3dDevice->CreateConstantBufferView(&cbvDesc[1], cbvHandle1);
+
 }
 
 
