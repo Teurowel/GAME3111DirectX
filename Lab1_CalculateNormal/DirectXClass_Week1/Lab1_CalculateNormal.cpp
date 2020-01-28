@@ -40,47 +40,54 @@ int main()
 		return 0;
 	}
 
+	//XMVECTOR color = XMVectorSet(0.9f, 0.8f, 0.7f, 1.0f);
+	XMCOLOR color32 = XMCOLOR(4288269490);
+	//XMStoreColor(&color32, color);
 
-	XMVECTOR p0 = XMVectorSet(1.0f, 0.0f, 0.0f, 1.f);
-	XMVECTOR p1 = XMVectorSet(1.0f, 2.0f, 3.0f, 1.f);
-	XMVECTOR p2 = XMVectorSet(-2.0f, 1.0f, -3.0f, 1.f);
-
-	ComputeNormal(p0, p1, p2);
-
-
+	XMVECTOR color = XMLoadColor(&color32);
+	int a = 10;
 
 
+	//XMVECTOR p0 = XMVectorSet(1.0f, 0.0f, 0.0f, 1.f);
+	//XMVECTOR p1 = XMVectorSet(1.0f, 2.0f, 3.0f, 1.f);
+	//XMVECTOR p2 = XMVectorSet(-2.0f, 1.0f, -3.0f, 1.f);
 
-
-	XMVECTOR p = XMVectorSet(2.0f, 2.0f, 1.0f, 0.0f);
-	XMVECTOR q = XMVectorSet(2.0f, -0.5f, 0.5f, 0.1f);
-	XMVECTOR u = XMVectorSet(1.0f, 2.0f, 4.0f, 8.0f);
-	XMVECTOR v = XMVectorSet(-2.0f, 1.0f, -3.0f, 2.5f);
-	XMVECTOR w = XMVectorSet(0.0f, XM_PIDIV4, XM_PIDIV2, XM_PI);
+	//ComputeNormal(p0, p1, p2);
 
 
 
-	cout << endl;;
-	cout << XMVectorAbs(v) << endl;
-	cout << XMVectorCos(w) << endl;
-	cout << XMVectorLog(u) << endl;
 
 
-	cout << endl;
-	cout << XMVectorLog(u) << endl;
-	cout << XMVectorExp(p) << endl;
-	cout << XMVectorPow(u, p) << endl;
 
-	cout << endl;
-	cout << XMVectorSqrt(u) << endl;
-	cout << XMVectorSwizzle(u, 2, 2, 1, 3) << endl;
-	cout << XMVectorSwizzle(u, 2, 1, 0, 3) << endl;
-	cout << XMVectorMultiply(u, v) << endl;
+	//XMVECTOR p = XMVectorSet(2.0f, 2.0f, 1.0f, 0.0f);
+	//XMVECTOR q = XMVectorSet(2.0f, -0.5f, 0.5f, 0.1f);
+	//XMVECTOR u = XMVectorSet(1.0f, 2.0f, 4.0f, 8.0f);
+	//XMVECTOR v = XMVectorSet(-2.0f, 1.0f, -3.0f, 2.5f);
+	//XMVECTOR w = XMVectorSet(0.0f, XM_PIDIV4, XM_PIDIV2, XM_PI);
 
-	cout << endl;
-	cout << XMVectorSaturate(q) << endl;
-	cout << XMVectorMin(p, v) << endl;
-	cout << XMVectorMax(p, v) << endl;
+
+
+	//cout << endl;;
+	//cout << XMVectorAbs(v) << endl;
+	//cout << XMVectorCos(w) << endl;
+	//cout << XMVectorLog(u) << endl;
+
+
+	//cout << endl;
+	//cout << XMVectorLog(u) << endl;
+	//cout << XMVectorExp(p) << endl;
+	//cout << XMVectorPow(u, p) << endl;
+
+	//cout << endl;
+	//cout << XMVectorSqrt(u) << endl;
+	//cout << XMVectorSwizzle(u, 2, 2, 1, 3) << endl;
+	//cout << XMVectorSwizzle(u, 2, 1, 0, 3) << endl;
+	//cout << XMVectorMultiply(u, v) << endl;
+
+	//cout << endl;
+	//cout << XMVectorSaturate(q) << endl;
+	//cout << XMVectorMin(p, v) << endl;
+	//cout << XMVectorMax(p, v) << endl;
 
 	return 0;
 }

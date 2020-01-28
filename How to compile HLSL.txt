@@ -1,0 +1,26 @@
+///////////////////////////////////////////////////////////////////////////
+Right click .hlsl file -> Propertes -> HLSL Compiler -> General ->
+
+For vertex Shader: 
+Entrypoint Name : VS(or your vertex shader start function's name)
+SHader Type: Vertex Shader
+Shader Model: Shader Model 5.1( or your model number)
+
+For pixel Shader
+Entrypoint Name : PS(or your vertex shader start function's name)
+SHader Type: Pixel Shader
+Shader Model: Shader Model 5.1( or your model number)
+///////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////
+Set where .cso file will be created(binray form of shader code)
+Output files -> Object File Name -> $(ProjectDir)shaders\%(Filename).cso
+///////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////
+How to create Assembler version of HLSL
+All options -> Assembler Output : Assembly-Only Listing(/Fc)
+Assembler Output File: $(ProjectDir)shaders\%(Filename).asm
+///////////////////////////////////////////////////////////////////////////
