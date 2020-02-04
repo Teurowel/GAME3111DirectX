@@ -1,5 +1,5 @@
 //***************************************************************************************
-// Grid Using Frame Resources
+// Sphere Using Frame Resources
 //
 // Hold down '1' key to view scene in wireframe mode.
 //***************************************************************************************
@@ -227,14 +227,6 @@ void ShapesApp::Update(const GameTimer& gt)
 	mCurrFrameResourceIndex = (mCurrFrameResourceIndex + 1) % gNumFrameResources;
 	mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
 
-	std::wstring text = L"CPU working on Frame Number = " + std::to_wstring(mCurrFrameResourceIndex)+ L"\n";
-	text += L"CPU is working on current fence Number = " + std::to_wstring(mCurrentFence - 1) + L"\n";
-
-	// Has the GPU finished processing the commands of the current frame resource?
-	// If not, wait until the GPU has completed commands up to this fence point.
-	text += L"CPU has added commands up to this Fence Number = " + std::to_wstring(mCurrFrameResource->Fence) + L"\n";
-	text += L"GPU has completed commands up to Fence Number = " + std::to_wstring(mFence->GetCompletedValue()) + L"\n";
-	OutputDebugString(text.c_str());
 
 	//this section is really what D3DApp::FlushCommandQueue() used to do for us at the end of each draw() function!
 	if (mCurrFrameResource->Fence != 0 && mFence->GetCompletedValue() < mCurrFrameResource->Fence)
@@ -590,12 +582,12 @@ void ShapesApp::BuildShadersAndInputLayout()
 //step16
 void ShapesApp::BuildShapeGeometry()
 {
-	//GeometryGenerator is a utility class for generating simple geometric shapes like grids, grid, grids, and boxes
+	//GeometryGenerator is a utility class for generating simple geometric shapes like grids, sphere, spheres, and boxes
 	GeometryGenerator geoGen;
 	//The MeshData structure is a simple structure nested inside GeometryGenerator that stores a vertexand index list
 
-	//GeometryGenerator::CreateGrid(float width, float depth, uint32 m, uint32 n)
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
+	//GeometryGenerator::CreateSphere(float radius, uint32 sliceCount, uint32 stackCount)
+	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 
 
 
@@ -605,20 +597,20 @@ void ShapesApp::BuildShapeGeometry()
 	//
 
 	// Cache the vertex offsets to each object in the concatenated vertex buffer.
-	UINT gridVertexOffset = 0;
+	UINT sphereVertexOffset = 0;
 
 
 	// Cache the starting index for each object in the concatenated index buffer.
-	UINT gridIndexOffset = 0;
+	UINT sphereIndexOffset = 0;
 
 
 	// Define the SubmeshGeometry that cover different 
 	// regions of the vertex/index buffers.
 
-	SubmeshGeometry gridSubmesh;
-	gridSubmesh.IndexCount = (UINT)grid.Indices32.size();
-	gridSubmesh.StartIndexLocation = gridIndexOffset;
-	gridSubmesh.BaseVertexLocation = gridVertexOffset;
+	SubmeshGeometry sphereSubmesh;
+	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+	sphereSubmesh.StartIndexLocation = sphereIndexOffset;
+	sphereSubmesh.BaseVertexLocation = sphereVertexOffset;
 
 
 	//
@@ -626,21 +618,21 @@ void ShapesApp::BuildShapeGeometry()
 	// vertices of all the meshes into one vertex buffer.
 	//
 
-	auto totalVertexCount = grid.Vertices.size();
+	auto totalVertexCount = sphere.Vertices.size();
 
 
 	std::vector<Vertex> vertices(totalVertexCount);
 
 	UINT k = 0;
-	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
+	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
 	{
-		vertices[k].Pos = grid.Vertices[i].Position;
+		vertices[k].Pos = sphere.Vertices[i].Position;
 		vertices[k].Color = XMFLOAT4(DirectX::Colors::DarkOrange);
 	}
 
 
 	std::vector<std::uint16_t> indices;
-	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
 
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
@@ -666,7 +658,7 @@ void ShapesApp::BuildShapeGeometry()
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	geo->DrawArgs["grid"] = gridSubmesh;
+	geo->DrawArgs["sphere"] = sphereSubmesh;
 
 
 	mGeometries[geo->Name] = std::move(geo);
@@ -729,15 +721,15 @@ void ShapesApp::BuildFrameResources()
 
 void ShapesApp::BuildRenderItems()
 {
-	auto gridRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&gridRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
-	gridRitem->ObjCBIndex = 0;
-	gridRitem->Geo = mGeometries["shapeGeo"].get();
-	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;  //13806
-	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation; //0
-	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation; //0
-	mAllRitems.push_back(std::move(gridRitem));
+	auto sphereRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&sphereRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
+	sphereRitem->ObjCBIndex = 0;
+	sphereRitem->Geo = mGeometries["shapeGeo"].get();
+	sphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	sphereRitem->IndexCount = sphereRitem->Geo->DrawArgs["sphere"].IndexCount;  //2280
+	sphereRitem->StartIndexLocation = sphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation; //0
+	sphereRitem->BaseVertexLocation = sphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation; //0
+	mAllRitems.push_back(std::move(sphereRitem));
 
 
 	// All the render items are opaque.
