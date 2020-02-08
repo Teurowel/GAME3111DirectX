@@ -589,6 +589,9 @@ void ShapesApp::BuildShapeGeometry()
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 	GeometryGenerator::MeshData pyramid = geoGen.CreatePyramid(1, 1, 1, 0);
 	GeometryGenerator::MeshData cone = geoGen.CreateCone(1.f, 1.f, 40, 6);
+	GeometryGenerator::MeshData diamond = geoGen.CreateDiamond(1, 2, 1, 0);
+	GeometryGenerator::MeshData wedge = geoGen.CreateWedge(1, 1, 1, 0);
+	GeometryGenerator::MeshData halfPyramid = geoGen.CreateHalfPyramid(1, 1, 0.5, 0.5, 1, 0);
 
 
 	//
@@ -604,6 +607,9 @@ void ShapesApp::BuildShapeGeometry()
 	UINT cylinderVertexOffset = sphereVertexOffset + (UINT)sphere.Vertices.size();
 	UINT pyramidVertexOffset = cylinderVertexOffset + (UINT)cylinder.Vertices.size();
 	UINT coneVertexOffset = pyramidVertexOffset + (UINT)pyramid.Vertices.size();
+	UINT diamondVertexOffset = coneVertexOffset + (UINT)cone.Vertices.size();
+	UINT wedgeVertexOffset = diamondVertexOffset + (UINT)diamond.Vertices.size();
+	UINT halfPyramidVertexOffset = wedgeVertexOffset + (UINT)wedge.Vertices.size();
 
 
 
@@ -615,6 +621,9 @@ void ShapesApp::BuildShapeGeometry()
 	UINT cylinderIndexOffset = sphereIndexOffset + (UINT)sphere.Indices32.size();
 	UINT pyramidIndexOffset = cylinderIndexOffset + (UINT)cylinder.Indices32.size();
 	UINT coneIndexOffset = pyramidIndexOffset + (UINT)pyramid.Indices32.size();
+	UINT diamondIndexOffset = coneIndexOffset + (UINT)cone.Indices32.size();
+	UINT wedgeIndexOffset = diamondIndexOffset + (UINT)diamond.Indices32.size();
+	UINT halfPyramidIndexOffset = wedgeIndexOffset + (UINT)wedge.Indices32.size();
 
 
 
@@ -654,6 +663,21 @@ void ShapesApp::BuildShapeGeometry()
 	coneSubmesh.StartIndexLocation = coneIndexOffset;
 	coneSubmesh.BaseVertexLocation = coneVertexOffset;
 
+	SubmeshGeometry diamondSubmesh;
+	diamondSubmesh.IndexCount = (UINT)diamond.Indices32.size();
+	diamondSubmesh.StartIndexLocation = diamondIndexOffset;
+	diamondSubmesh.BaseVertexLocation = diamondVertexOffset;
+
+	SubmeshGeometry wedgeSubmesh;
+	wedgeSubmesh.IndexCount = (UINT)wedge.Indices32.size();
+	wedgeSubmesh.StartIndexLocation = wedgeIndexOffset;
+	wedgeSubmesh.BaseVertexLocation = wedgeVertexOffset;
+
+	SubmeshGeometry halfPyramidSubmesh;
+	halfPyramidSubmesh.IndexCount = (UINT)halfPyramid.Indices32.size();
+	halfPyramidSubmesh.StartIndexLocation = halfPyramidIndexOffset;
+	halfPyramidSubmesh.BaseVertexLocation = halfPyramidVertexOffset;
+
 
 
 
@@ -667,7 +691,10 @@ void ShapesApp::BuildShapeGeometry()
 		sphere.Vertices.size() +
 		cylinder.Vertices.size() +
 		pyramid.Vertices.size() + 
-		cone.Vertices.size();
+		cone.Vertices.size() +
+		diamond.Vertices.size() +
+		wedge.Vertices.size() + 
+		halfPyramid.Vertices.size();
 
 
 
@@ -711,6 +738,24 @@ void ShapesApp::BuildShapeGeometry()
 		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
 	}
 
+	for (size_t i = 0; i < diamond.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = diamond.Vertices[i].Position;
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+	}
+
+	for (size_t i = 0; i < wedge.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = wedge.Vertices[i].Position;
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+	}
+
+	for (size_t i = 0; i < halfPyramid.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = halfPyramid.Vertices[i].Position;
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+	}
+
 
 
 
@@ -722,6 +767,9 @@ void ShapesApp::BuildShapeGeometry()
 	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
 	indices.insert(indices.end(), std::begin(pyramid.GetIndices16()), std::end(pyramid.GetIndices16()));
 	indices.insert(indices.end(), std::begin(cone.GetIndices16()), std::end(cone.GetIndices16()));
+	indices.insert(indices.end(), std::begin(diamond.GetIndices16()), std::end(diamond.GetIndices16()));
+	indices.insert(indices.end(), std::begin(wedge.GetIndices16()), std::end(wedge.GetIndices16()));
+	indices.insert(indices.end(), std::begin(halfPyramid.GetIndices16()), std::end(halfPyramid.GetIndices16()));
 
 
 
@@ -756,6 +804,9 @@ void ShapesApp::BuildShapeGeometry()
 	geo->DrawArgs["cylinder"] = cylinderSubmesh;
 	geo->DrawArgs["pyramid"] = pyramidSubmesh;
 	geo->DrawArgs["cone"] = coneSubmesh;
+	geo->DrawArgs["diamond"] = diamondSubmesh;
+	geo->DrawArgs["wedge"] = wedgeSubmesh;
+	geo->DrawArgs["halfPyramid"] = halfPyramidSubmesh;
 
 
 
@@ -911,6 +962,36 @@ void ShapesApp::BuildRenderItems()
 	coneRitem->StartIndexLocation = coneRitem->Geo->DrawArgs["cone"].StartIndexLocation;
 	coneRitem->BaseVertexLocation = coneRitem->Geo->DrawArgs["cone"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(coneRitem));
+
+	auto diamondRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&diamondRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(5.0f, 5.f, 0.0f));
+	diamondRitem->ObjCBIndex = objCBIndex++;
+	diamondRitem->Geo = mGeometries["shapeGeo"].get();
+	diamondRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	diamondRitem->IndexCount = diamondRitem->Geo->DrawArgs["diamond"].IndexCount;
+	diamondRitem->StartIndexLocation = diamondRitem->Geo->DrawArgs["diamond"].StartIndexLocation;
+	diamondRitem->BaseVertexLocation = diamondRitem->Geo->DrawArgs["diamond"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(diamondRitem));
+
+	auto wedgeRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&wedgeRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(0.0f, 5.f, 5.0f));
+	wedgeRitem->ObjCBIndex = objCBIndex++;
+	wedgeRitem->Geo = mGeometries["shapeGeo"].get();
+	wedgeRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	wedgeRitem->IndexCount = wedgeRitem->Geo->DrawArgs["wedge"].IndexCount;
+	wedgeRitem->StartIndexLocation = wedgeRitem->Geo->DrawArgs["wedge"].StartIndexLocation;
+	wedgeRitem->BaseVertexLocation = wedgeRitem->Geo->DrawArgs["wedge"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(wedgeRitem));
+
+	auto halfPyramidRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&halfPyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(5.0f, 5.f, 5.0f));
+	halfPyramidRitem->ObjCBIndex = objCBIndex++;
+	halfPyramidRitem->Geo = mGeometries["shapeGeo"].get();
+	halfPyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	halfPyramidRitem->IndexCount = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].IndexCount;
+	halfPyramidRitem->StartIndexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].StartIndexLocation;
+	halfPyramidRitem->BaseVertexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(halfPyramidRitem));
 
 	// All the render items are opaque.
 	for (auto& e : mAllRitems)

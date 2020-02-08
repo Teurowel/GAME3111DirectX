@@ -113,8 +113,17 @@ public:
 	//create pyramid
 	MeshData CreatePyramid(float width, float height, float depth, uint32 numSubdivisions);
 
+	//create halfPyramid
+	MeshData CreateHalfPyramid(float bottomWidth, float bottomDepth, float topWidth, float topDepth, float height, uint32 numSubdivisions);
+
 	//create Cone
 	MeshData CreateCone(float bottomRadius, float height, uint32 sliceCount, uint32 stackCount);
+
+	//create Diamond
+	MeshData CreateDiamond(float width, float height, float depth, uint32 numSubdivisions);
+
+	//create Wedge
+	MeshData CreateWedge(float width, float height, float depth, uint32 numSubdivisions);
 
 	void Subdivide(MeshData& meshData);
 private:

@@ -286,7 +286,269 @@ GeometryGenerator::MeshData GeometryGenerator::CreatePyramid(float width, float 
 	return meshData;
 }
 
+GeometryGenerator::MeshData GeometryGenerator::CreateHalfPyramid(float bottomWidth, float bottomDepth, float topWidth, float topDepth, float height, uint32 numSubdivisions)
+{
+	MeshData meshData;
 
+	//Create vertices
+	Vertex v[24];
+
+	float bw2 = 0.5f * bottomWidth;
+	float bd2 = 0.5f * bottomDepth;
+
+	float tw2 = 0.5f * topWidth;
+	float td2 = 0.5f * topDepth;
+
+	float h2 = 0.5f * height;
+
+	//Front squre
+	v[0] = Vertex(-bw2, -h2, -bd2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(-tw2, +h2, -td2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[2] = Vertex(+tw2, +h2, -td2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[3] = Vertex(+bw2, -h2, -bd2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Right squre
+	v[4] = Vertex(+bw2, -h2, -bd2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[5] = Vertex(+tw2, +h2, -td2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[6] = Vertex(+tw2, +h2, +td2, 1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[7] = Vertex(+bw2, -h2, +bd2, 1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.f, 1.0f);
+
+	//Back Square
+	v[8] = Vertex(+bw2, -h2, +bd2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.f, 1.0f);
+	v[9] = Vertex(+tw2, +h2, +td2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[10] = Vertex(-tw2, +h2, +td2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.f, 0.0f);
+	v[11] = Vertex(-bw2, -h2, +bd2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	
+	//Left Squre
+	v[12] = Vertex(-bw2, -h2, +bd2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[13] = Vertex(-tw2, +h2, +td2, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.f, 0.0f);
+	v[14] = Vertex(-tw2, +h2, -td2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[15] = Vertex(-bw2, -h2, -bd2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Top Squre
+	v[16] = Vertex(-tw2, +h2, -td2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[17] = Vertex(-tw2, +h2, +td2, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.f, 0.0f);
+	v[18] = Vertex(+tw2, +h2, +td2, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[19] = Vertex(+tw2, +h2, -td2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Bottom Squre
+	v[20] = Vertex(-bw2, -h2, +bd2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[21] = Vertex(-bw2, -h2, -bd2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[22] = Vertex(+bw2, -h2, -bd2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[23] = Vertex(+bw2, -h2, +bd2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.f, 1.0f);
+
+	meshData.Vertices.assign(&v[0], &v[24]);
+
+	//
+	// Create the indices.
+	//
+
+	uint32 i[36];
+
+	//Front squre
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	i[3] = 0; i[4] = 2; i[5] = 3;
+
+	//Right squre
+	i[6] = 4; i[7] = 5; i[8] = 6;
+	i[9] = 4; i[10] = 6; i[11] = 7;
+
+	//Back Square
+	i[12] = 8; i[13] = 9; i[14] = 10;
+	i[15] = 8; i[16] = 10; i[17] = 11;
+
+	//Left Squre
+	i[18] = 12; i[19] = 13; i[20] = 14;
+	i[21] = 12; i[22] = 14; i[23] = 15;
+
+	//Top Squre
+	i[24] = 16; i[25] = 17; i[26] = 18;
+	i[27] = 16; i[28] = 18; i[29] = 19;
+
+	//Bottom Squre
+	i[30] = 20; i[31] = 21; i[32] = 22;
+	i[33] = 20; i[34] = 22; i[35] = 23;
+
+	meshData.Indices32.assign(&i[0], &i[36]);
+
+	// Put a cap on the number of subdivisions.
+	numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+
+	for (uint32 i = 0; i < numSubdivisions; ++i)
+		Subdivide(meshData);
+
+	return meshData;
+}
+
+
+
+GeometryGenerator::MeshData GeometryGenerator::CreateDiamond(float width, float height, float depth, uint32 numSubdivisions)
+{
+	MeshData meshData;
+
+	//Create vertices
+	Vertex v[18];
+
+	float w2 = 0.5f * width;
+	float h2 = 0.5f * height;
+	float d2 = 0.5f * depth;
+
+	//Top Front Triangle
+	v[0] = Vertex(0, +h2, 0, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[1] = Vertex(+w2, 0, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[2] = Vertex(-w2, 0, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	//Top right Triangle
+	v[3] = Vertex(+w2, 0, +d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[4] = Vertex(+w2, 0, -d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+	//Top back triangle
+	v[5] = Vertex(-w2, 0, +d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[6] = Vertex(+w2, 0, +d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+	//Top left triangle
+	v[7] = Vertex(-w2, 0, -d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[8] = Vertex(-w2, 0, +d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+
+	//Bottom Front Triangle
+	v[9] = Vertex(0, -h2, 0, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[10] = Vertex(-w2, 0, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[11] = Vertex(+w2, 0, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+	//bottom right Triangle
+	v[12] = Vertex(+w2, 0, -d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[13] = Vertex(+w2, 0, +d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	//bottom back triangle
+	v[14] = Vertex(+w2, 0, +d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[15] = Vertex(-w2, 0, +d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	//bottom left triangle
+	v[16] = Vertex(-w2, 0, +d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[17] = Vertex(-w2, 0, -d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	meshData.Vertices.assign(&v[0], &v[18]);
+
+	//
+	// Create the indices.
+	//
+
+	uint32 i[24];
+
+	//Top Front Triangle
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	
+	//Top right Triangle
+	i[3] = 0; i[4] = 3; i[5] = 4;
+
+	//Top Back Triangle
+	i[6] = 0; i[7] = 5; i[8] = 6;
+
+	//Top left Triangle
+	i[9] = 0; i[10] = 7; i[11] = 8;
+
+	//Bottom Front Triangle
+	i[12] = 9; i[13] = 10; i[14] = 11;
+
+	//Bottom right Triangle
+	i[15] = 9; i[16] = 12; i[17] = 13;
+
+	//Bottom back Triangle
+	i[18] = 9; i[19] = 14; i[20] = 15;
+
+	//Bottom left Triangle
+	i[21] = 9; i[22] = 16; i[23] = 17;
+
+
+	meshData.Indices32.assign(&i[0], &i[24]);
+
+	// Put a cap on the number of subdivisions.
+	numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+
+	for (uint32 i = 0; i < numSubdivisions; ++i)
+		Subdivide(meshData);
+
+	return meshData;
+}
+
+GeometryGenerator::MeshData GeometryGenerator::CreateWedge(float width, float height, float depth, uint32 numSubdivisions)
+{
+	MeshData meshData;
+
+	//Create vertices
+	Vertex v[18];
+
+	float w2 = 0.5f * width;
+	float h2 = 0.5f * height;
+	float d2 = 0.5f * depth;
+
+	//Front Square
+	v[0] = Vertex(-w2, -h2, -d2, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(-w2, +h2, +d2, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[2] = Vertex(+w2, +h2, +d2, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[3] = Vertex(+w2, -h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Right Triangle
+	v[4] = Vertex(+w2, -h2, -d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[5] = Vertex(+w2, +h2, +d2, 1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[6] = Vertex(+w2, -h2, +d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Back Square
+	v[7] = Vertex(+w2, -h2, +d2, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[8] = Vertex(+w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[9] = Vertex(-w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[10] = Vertex(-w2, -h2, +d2, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+	//Left Triangle
+	v[11] = Vertex(-w2, -h2, +d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[12] = Vertex(-w2, +h2, +d2, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[13] = Vertex(-w2, -h2, -d2, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//BOtton Square
+	v[14] = Vertex(-w2, -h2, +d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[15] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[16] = Vertex(+w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[17] = Vertex(+w2, -h2, +d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	
+	
+	meshData.Vertices.assign(&v[0], &v[18]);
+
+	//
+	// Create the indices.
+	//
+
+	uint32 i[24];
+
+	//Front Square
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	i[3] = 0; i[4] = 2; i[5] = 3;
+
+	//Right Triangle
+	i[6] = 4; i[7] = 5; i[8] = 6;
+
+	//Back Square
+	i[9] = 7; i[10] = 8; i[11] = 9;
+	i[12] = 7; i[13] = 9; i[14] = 10;
+
+	//Left Triangle
+	i[15] = 11; i[16] = 12; i[17] = 13;
+	
+	//BOtton Square
+	i[18] = 14; i[19] = 15; i[20] = 16;
+	i[21] = 14; i[22] = 16; i[23] = 17;
+	
+
+	meshData.Indices32.assign(&i[0], &i[24]);
+
+	// Put a cap on the number of subdivisions.
+	numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+
+	for (uint32 i = 0; i < numSubdivisions; ++i)
+		Subdivide(meshData);
+
+	return meshData;
+}
 
 void GeometryGenerator::Subdivide(MeshData& meshData)
 {
