@@ -109,11 +109,20 @@ public:
 	/// Creates a quad aligned with the screen.  This is useful for postprocessing and screen effects.
 	///</summary>
     MeshData CreateQuad(float x, float y, float w, float h, float depth);
+
+	//create pyramid
+	MeshData CreatePyramid(float width, float height, float depth, uint32 numSubdivisions);
+
+	//create Cone
+	MeshData CreateCone(float bottomRadius, float height, uint32 sliceCount, uint32 stackCount);
+
 	void Subdivide(MeshData& meshData);
 private:
 	
     Vertex MidPoint(const Vertex& v0, const Vertex& v1);
     void BuildCylinderTopCap(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount, MeshData& meshData);
     void BuildCylinderBottomCap(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount, MeshData& meshData);
+
+	void BuildConeTopCap(float height, uint32 sliceCount, MeshData& meshData);
 };
 

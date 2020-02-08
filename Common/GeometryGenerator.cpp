@@ -210,7 +210,84 @@ GeometryGenerator::MeshData GeometryGenerator::CreateSphere(float radius, uint32
 
     return meshData;
 }
- 
+
+
+GeometryGenerator::MeshData GeometryGenerator::CreatePyramid(float width, float height, float depth, uint32 numSubdivisions)
+{
+	MeshData meshData;
+
+	//Create vertices
+	Vertex v[16];
+
+	float w2 = 0.5f * width;
+	float h2 = 0.5f * height;
+	float d2 = 0.5f * depth;
+
+	//Bottom squre
+	v[0] = Vertex(-w2, -h2, +d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[2] = Vertex(+w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[3] = Vertex(+w2, -h2, +d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Front Triangle
+	v[4] = Vertex(0, +h2, 0, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[5] = Vertex(+w2, -h2, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[6] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	//Right Triangle
+	v[7] = Vertex(0, +h2, 0, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[8] = Vertex(+w2, -h2, +d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[9] = Vertex(+w2, -h2, -d2, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+	//Back Triangle
+	v[10] = Vertex(0, +h2, 0, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[11] = Vertex(-w2, -h2, +d2, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[12] = Vertex(+w2, -h2, +d2, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	//Left Triangle
+	v[13] = Vertex(0, +h2, 0, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[14] = Vertex(-w2, -h2, -d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[15] = Vertex(-w2, -h2, +d2, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	
+
+	meshData.Vertices.assign(&v[0], &v[16]);
+
+	//
+	// Create the indices.
+	//
+
+	uint32 i[18];
+
+	//Bottom square
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	i[3] = 0; i[4] = 2; i[5] = 3;
+
+	//Front triangle
+	i[6] = 4; i[7] = 5; i[8] = 6;
+
+	//Right Triangle
+	i[9] = 7; i[10] = 8; i[11] = 9;
+
+	//Back Triangle
+	i[12] = 10; i[13] = 11; i[14] = 12;
+
+	//Let Triangle
+	i[15] = 13; i[16] = 14; i[17] = 15;
+
+
+	meshData.Indices32.assign(&i[0], &i[18]);
+
+	// Put a cap on the number of subdivisions.
+	numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+
+	for (uint32 i = 0; i < numSubdivisions; ++i)
+		Subdivide(meshData);
+
+	return meshData;
+}
+
+
+
 void GeometryGenerator::Subdivide(MeshData& meshData)
 {
 	// Save a copy of the input geometry.
@@ -473,6 +550,101 @@ GeometryGenerator::MeshData GeometryGenerator::CreateCylinder(float bottomRadius
     return meshData;
 }
 
+
+GeometryGenerator::MeshData GeometryGenerator::CreateCone(float bottomRadius, float height, uint32 sliceCount, uint32 stackCount)
+{
+	MeshData meshData;
+
+	//
+	// Build Stacks.
+	// 
+
+	float stackHeight = height / stackCount;
+
+	// Amount to increment radius as we move up each stack level from bottom to top.
+	float radiusStep = -bottomRadius / stackCount;
+
+	uint32 ringCount = stackCount;
+
+	// Compute vertices for each stack ring starting at the bottom and moving up.
+	for (uint32 i = 0; i < ringCount; ++i)
+	{
+		float y = -0.5f * height + i * stackHeight;
+		float r = bottomRadius + i * radiusStep;
+
+		// vertices of ring
+		float dTheta = 2.0f * XM_PI / sliceCount;
+		for (uint32 j = 0; j <= sliceCount; ++j)
+		{
+			Vertex vertex;
+
+			float c = cosf(j * dTheta);
+			float s = sinf(j * dTheta);
+
+			vertex.Position = XMFLOAT3(r * c, y, r * s);
+
+			vertex.TexC.x = (float)j / sliceCount;
+			vertex.TexC.y = 1.0f - (float)i / stackCount;
+
+			// Cylinder can be parameterized as follows, where we introduce v
+			// parameter that goes in the same direction as the v tex-coord
+			// so that the bitangent goes in the same direction as the v tex-coord.
+			//   Let r0 be the bottom radius and let r1 be the top radius.
+			//   y(v) = h - hv for v in [0,1].
+			//   r(v) = r1 + (r0-r1)v
+			//
+			//   x(t, v) = r(v)*cos(t)
+			//   y(t, v) = h - hv
+			//   z(t, v) = r(v)*sin(t)
+			// 
+			//  dx/dt = -r(v)*sin(t)
+			//  dy/dt = 0
+			//  dz/dt = +r(v)*cos(t)
+			//
+			//  dx/dv = (r0-r1)*cos(t)
+			//  dy/dv = -h
+			//  dz/dv = (r0-r1)*sin(t)
+
+			// This is unit length.
+			vertex.TangentU = XMFLOAT3(-s, 0.0f, c);
+
+			float dr = bottomRadius;
+			XMFLOAT3 bitangent(dr * c, -height, dr * s);
+
+			XMVECTOR T = XMLoadFloat3(&vertex.TangentU);
+			XMVECTOR B = XMLoadFloat3(&bitangent);
+			XMVECTOR N = XMVector3Normalize(XMVector3Cross(T, B));
+			XMStoreFloat3(&vertex.Normal, N);
+
+			meshData.Vertices.push_back(vertex);
+		}
+	}
+
+	// Add one because we duplicate the first and last vertex per ring
+	// since the texture coordinates are different.
+	uint32 ringVertexCount = sliceCount + 1;
+
+	// Compute indices for each stack.
+	for (uint32 i = 0; i < stackCount - 1; ++i)
+	{
+		for (uint32 j = 0; j < sliceCount; ++j)
+		{
+			meshData.Indices32.push_back(i * ringVertexCount + j);
+			meshData.Indices32.push_back((i + 1) * ringVertexCount + j);
+			meshData.Indices32.push_back((i + 1) * ringVertexCount + j + 1);
+
+			meshData.Indices32.push_back(i * ringVertexCount + j);
+			meshData.Indices32.push_back((i + 1) * ringVertexCount + j + 1);
+			meshData.Indices32.push_back(i * ringVertexCount + j + 1);
+		}
+	}
+
+	BuildConeTopCap(height, sliceCount, meshData);
+	BuildCylinderBottomCap(bottomRadius, 0, height, sliceCount, stackCount, meshData);
+
+	return meshData;
+}
+
 void GeometryGenerator::BuildCylinderTopCap(float bottomRadius, float topRadius, float height,
 											uint32 sliceCount, uint32 stackCount, MeshData& meshData)
 {
@@ -545,6 +717,26 @@ void GeometryGenerator::BuildCylinderBottomCap(float bottomRadius, float topRadi
 		meshData.Indices32.push_back(centerIndex);
 		meshData.Indices32.push_back(baseIndex + i);
 		meshData.Indices32.push_back(baseIndex + i+1);
+	}
+}
+
+void GeometryGenerator::BuildConeTopCap(float height, uint32 sliceCount, MeshData& meshData)
+{
+	uint32 baseIndex = (uint32)meshData.Vertices.size() - (sliceCount + 1);
+
+	float y = 0.5f * height;
+
+	//Create top vertex
+	meshData.Vertices.push_back(Vertex(0.0f, y, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.0f));
+
+	// Index of center vertex.
+	uint32 centerIndex = (uint32)meshData.Vertices.size() - 1;
+
+	for (uint32 i = 0; i < sliceCount; ++i)
+	{
+		meshData.Indices32.push_back(centerIndex);
+		meshData.Indices32.push_back(baseIndex + i + 1);
+		meshData.Indices32.push_back(baseIndex + i );
 	}
 }
 
