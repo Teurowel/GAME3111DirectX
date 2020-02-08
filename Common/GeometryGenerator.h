@@ -125,6 +125,9 @@ public:
 	//create Wedge
 	MeshData CreateWedge(float width, float height, float depth, uint32 numSubdivisions);
 
+	//create triSqure
+	MeshData CreateTriSquare(float lengthOfTri, float height, uint32 numSubdivisions);
+
 	void Subdivide(MeshData& meshData);
 private:
 	

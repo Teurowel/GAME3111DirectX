@@ -592,6 +592,7 @@ void ShapesApp::BuildShapeGeometry()
 	GeometryGenerator::MeshData diamond = geoGen.CreateDiamond(1, 2, 1, 0);
 	GeometryGenerator::MeshData wedge = geoGen.CreateWedge(1, 1, 1, 0);
 	GeometryGenerator::MeshData halfPyramid = geoGen.CreateHalfPyramid(1, 1, 0.5, 0.5, 1, 0);
+	GeometryGenerator::MeshData triSquare = geoGen.CreateTriSquare(1, 2, 0);
 
 
 	//
@@ -610,7 +611,7 @@ void ShapesApp::BuildShapeGeometry()
 	UINT diamondVertexOffset = coneVertexOffset + (UINT)cone.Vertices.size();
 	UINT wedgeVertexOffset = diamondVertexOffset + (UINT)diamond.Vertices.size();
 	UINT halfPyramidVertexOffset = wedgeVertexOffset + (UINT)wedge.Vertices.size();
-
+	UINT triSquareVertexOffset = halfPyramidVertexOffset + (UINT)halfPyramid.Vertices.size();
 
 
 	//Step3
@@ -624,7 +625,7 @@ void ShapesApp::BuildShapeGeometry()
 	UINT diamondIndexOffset = coneIndexOffset + (UINT)cone.Indices32.size();
 	UINT wedgeIndexOffset = diamondIndexOffset + (UINT)diamond.Indices32.size();
 	UINT halfPyramidIndexOffset = wedgeIndexOffset + (UINT)wedge.Indices32.size();
-
+	UINT triSquareIndexOffset = halfPyramidIndexOffset + (UINT)halfPyramid.Indices32.size();
 
 
 
@@ -678,6 +679,11 @@ void ShapesApp::BuildShapeGeometry()
 	halfPyramidSubmesh.StartIndexLocation = halfPyramidIndexOffset;
 	halfPyramidSubmesh.BaseVertexLocation = halfPyramidVertexOffset;
 
+	SubmeshGeometry triSquareSubmesh;
+	triSquareSubmesh.IndexCount = (UINT)triSquare.Indices32.size();
+	triSquareSubmesh.StartIndexLocation = triSquareIndexOffset;
+	triSquareSubmesh.BaseVertexLocation = triSquareVertexOffset;
+
 
 
 
@@ -694,7 +700,8 @@ void ShapesApp::BuildShapeGeometry()
 		cone.Vertices.size() +
 		diamond.Vertices.size() +
 		wedge.Vertices.size() + 
-		halfPyramid.Vertices.size();
+		halfPyramid.Vertices.size() +
+		triSquare.Vertices.size();
 
 
 
@@ -729,31 +736,37 @@ void ShapesApp::BuildShapeGeometry()
 	for (size_t i = 0; i < pyramid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = pyramid.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Ivory);
 	}
 
 	for (size_t i = 0; i < cone.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = cone.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Black);
 	}
 
 	for (size_t i = 0; i < diamond.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = diamond.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::LightPink);
 	}
 
 	for (size_t i = 0; i < wedge.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = wedge.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Magenta);
 	}
 
 	for (size_t i = 0; i < halfPyramid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = halfPyramid.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::SteelBlue);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Blue);
+	}
+
+	for (size_t i = 0; i < triSquare.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = triSquare.Vertices[i].Position;
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Gold);
 	}
 
 
@@ -770,6 +783,7 @@ void ShapesApp::BuildShapeGeometry()
 	indices.insert(indices.end(), std::begin(diamond.GetIndices16()), std::end(diamond.GetIndices16()));
 	indices.insert(indices.end(), std::begin(wedge.GetIndices16()), std::end(wedge.GetIndices16()));
 	indices.insert(indices.end(), std::begin(halfPyramid.GetIndices16()), std::end(halfPyramid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(triSquare.GetIndices16()), std::end(triSquare.GetIndices16()));
 
 
 
@@ -807,6 +821,7 @@ void ShapesApp::BuildShapeGeometry()
 	geo->DrawArgs["diamond"] = diamondSubmesh;
 	geo->DrawArgs["wedge"] = wedgeSubmesh;
 	geo->DrawArgs["halfPyramid"] = halfPyramidSubmesh;
+	geo->DrawArgs["triSquare"] = triSquareSubmesh;
 
 
 
@@ -992,6 +1007,16 @@ void ShapesApp::BuildRenderItems()
 	halfPyramidRitem->StartIndexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].StartIndexLocation;
 	halfPyramidRitem->BaseVertexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(halfPyramidRitem));
+
+	auto triSquareRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&triSquareRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(-5.0f, 5.f, 5.0f));
+	triSquareRitem->ObjCBIndex = objCBIndex++;
+	triSquareRitem->Geo = mGeometries["shapeGeo"].get();
+	triSquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	triSquareRitem->IndexCount = triSquareRitem->Geo->DrawArgs["triSquare"].IndexCount;
+	triSquareRitem->StartIndexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].StartIndexLocation;
+	triSquareRitem->BaseVertexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(triSquareRitem));
 
 	// All the render items are opaque.
 	for (auto& e : mAllRitems)

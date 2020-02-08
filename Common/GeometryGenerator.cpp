@@ -550,6 +550,83 @@ GeometryGenerator::MeshData GeometryGenerator::CreateWedge(float width, float he
 	return meshData;
 }
 
+GeometryGenerator::MeshData GeometryGenerator::CreateTriSquare(float lengthOfTri, float height, uint32 numSubdivisions)
+{
+	MeshData meshData;
+
+	//Create vertices
+	Vertex v[18];
+
+	float lengthOfSide2 = 0.5f * lengthOfTri;
+	float lengthToSide = tan(XMConvertToRadians(30)) * lengthOfSide2;
+	float lengthToVertex = sqrtf(lengthOfSide2 * lengthOfSide2 + lengthToSide * lengthToSide);
+	float h2 = height * 0.5f;
+
+	//Bottom Triangle
+	v[0] = Vertex(-lengthOfSide2, -h2, -lengthToSide, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(+lengthOfSide2, -h2, -lengthToSide, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[2] = Vertex(0, -h2, +lengthToVertex, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+
+	//Front Squre
+	v[3] = Vertex(-lengthOfSide2, -h2, -lengthToSide, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[4] = Vertex(-lengthOfSide2, +h2, -lengthToSide, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[5] = Vertex(+lengthOfSide2, +h2, -lengthToSide, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[6] = Vertex(+lengthOfSide2, -h2, -lengthToSide, 0.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Right Squre
+	v[7] = Vertex(+lengthOfSide2, -h2, -lengthToSide, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[8] = Vertex(+lengthOfSide2, +h2, -lengthToSide, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[9] = Vertex(0, +h2, +lengthToVertex, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[10] = Vertex(0, -h2, +lengthToVertex, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.f, 1.0f);
+
+	//left Squre
+	v[11] = Vertex(0, -h2, +lengthToVertex, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.f, 1.0f);
+	v[12] = Vertex(0, +h2, +lengthToVertex, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[13] = Vertex(-lengthOfSide2, +h2, -lengthToSide, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[14] = Vertex(-lengthOfSide2, -h2, -lengthToSide, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	//Top Triangle
+	v[15] = Vertex(-lengthOfSide2, +h2, -lengthToSide, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[16] = Vertex(0, +h2, +lengthToVertex, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, 0.0f);
+	v[17] = Vertex(+lengthOfSide2, +h2, -lengthToSide, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+
+	meshData.Vertices.assign(&v[0], &v[18]);
+
+	//
+	// Create the indices.
+	//
+
+	uint32 i[24];
+
+	//Bottom Triangle
+	i[0] = 0; i[1] = 1; i[2] = 2;
+
+	//Front Squre
+	i[3] = 3; i[4] = 4; i[5] = 5;
+	i[6] = 3; i[7] = 5; i[8] = 6;
+
+	//Right Squre
+	i[9] = 7; i[10] = 8; i[11] = 9;
+	i[12] = 7; i[13] = 9; i[14] = 10;
+
+	//left Squre
+	i[15] = 11; i[16] = 12; i[17] = 13;
+	i[18] = 11; i[19] = 13; i[20] = 14;
+
+	//Top Triangle
+	i[21] = 15; i[22] = 16; i[23] = 17;
+
+	meshData.Indices32.assign(&i[0], &i[24]);
+
+	// Put a cap on the number of subdivisions.
+	numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+
+	for (uint32 i = 0; i < numSubdivisions; ++i)
+		Subdivide(meshData);
+
+	return meshData;
+}
+
 void GeometryGenerator::Subdivide(MeshData& meshData)
 {
 	// Save a copy of the input geometry.
