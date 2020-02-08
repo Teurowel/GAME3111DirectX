@@ -7,6 +7,8 @@
 struct ObjectConstants
 {
     DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4 color = DirectX::XMFLOAT4(0.f, 0.f, 0.f, 0.f);
+	
 };
 
 struct PassConstants

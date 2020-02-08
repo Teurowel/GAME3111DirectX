@@ -26,6 +26,7 @@ struct RenderItem
 	// relative to the world space, which defines the position, orientation,
 	// and scale of the object in the world.
 	XMFLOAT4X4 World = MathHelper::Identity4x4();
+	XMFLOAT4 color = XMFLOAT4(0.f, 0.f, 0.f, 0.f);
 
 	// Dirty flag indicating the object data has changed and we need to update the constant buffer.
 	// Because we have an object cbuffer for each FrameResource, we have to apply the
@@ -79,6 +80,9 @@ private:
 	void BuildPSOs();
 	void BuildFrameResources();
 	void BuildRenderItems();
+	void BuildPrimitives();
+	void BuildGround(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void BuildHospital(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
 private:
@@ -110,7 +114,7 @@ private:
 
 	bool mIsWireframe = false;
 
-	XMFLOAT3 mEyePos = { 0.0f, 5.0f, 0.0f };
+	XMFLOAT3 mEyePos = { 0.0f, 5.0f, -40.0f };
 	XMFLOAT3 mFront = { 0.f, 0.f, 1.f };
 	XMFLOAT3 mRight = { 1.f, 0.f, 0.f };
 	XMFLOAT3 mUp = { 0.f ,1.f, 0.f };
@@ -124,6 +128,8 @@ private:
 	
 
 	POINT mLastMousePos;
+
+	UINT mObjCBIndex = 0;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -417,9 +423,12 @@ void ShapesApp::UpdateObjectCBs(const GameTimer& gt)
 		if (e->NumFramesDirty > 0)
 		{
 			XMMATRIX world = XMLoadFloat4x4(&e->World);
+			XMVECTOR color = XMLoadFloat4(&e->color);
 
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
+			XMStoreFloat4(&objConstants.color, color);
+
 
 			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
 
@@ -581,10 +590,10 @@ void ShapesApp::BuildShadersAndInputLayout()
 void ShapesApp::BuildShapeGeometry()
 {
 	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 0.5f, 1.5f, 3);
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.f, 1.0f, 1.0f, 0);
 	
 	//Step1
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 10, 10);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
 	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 	GeometryGenerator::MeshData pyramid = geoGen.CreatePyramid(1, 1, 1, 0);
@@ -718,7 +727,7 @@ void ShapesApp::BuildShapeGeometry()
 	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = grid.Vertices[i].Position;
-		vertices[k].Color = XMFLOAT4(DirectX::Colors::ForestGreen);
+		vertices[k].Color = XMFLOAT4(DirectX::Colors::Aqua);
 	}
 
 	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
@@ -883,9 +892,22 @@ void ShapesApp::BuildFrameResources()
 
 void ShapesApp::BuildRenderItems()
 {
+	BuildPrimitives();
+	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3, 1.f, 3.f, 0.f));
+	BuildHospital(XMVectorSet(-10.f, 1.f, 10.f, 0.f));
+
+	// All the render items are opaque.
+	for (auto& e : mAllRitems)
+		mOpaqueRitems.push_back(e.get());
+}
+
+void ShapesApp::BuildPrimitives()
+{
+	//Build Box
 	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 0.5f, 0.0f));
-	boxRitem->ObjCBIndex = 0;
+	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(-15.0f, 5.f, 0.0f));
+	boxRitem->color = XMFLOAT4(DirectX::Colors::DarkOrange);
+	boxRitem->ObjCBIndex = mObjCBIndex++;
 	boxRitem->Geo = mGeometries["shapeGeo"].get();
 	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
@@ -893,74 +915,40 @@ void ShapesApp::BuildRenderItems()
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(boxRitem));
 
+
+	//Build Cylinder
+	auto leftCylRitem = std::make_unique<RenderItem>();
+	XMMATRIX leftCylWorld = XMMatrixTranslation(-20.0f, 5.f, 0.f);
+	XMStoreFloat4x4(&leftCylRitem->World, leftCylWorld);
+	leftCylRitem->color = XMFLOAT4(DirectX::Colors::SteelBlue);
+	leftCylRitem->ObjCBIndex = mObjCBIndex++;
+	leftCylRitem->Geo = mGeometries["shapeGeo"].get();
+	leftCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
+	leftCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	leftCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(leftCylRitem));
+
+
+	//Build SPhere
+	auto leftSphereRitem = std::make_unique<RenderItem>();
+	XMMATRIX leftSphereWorld = XMMatrixTranslation(-25.0f, 5.f, 0.f);
+	XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
+	leftSphereRitem->color = XMFLOAT4(DirectX::Colors::Crimson);
+	leftSphereRitem->ObjCBIndex = mObjCBIndex++;
+	leftSphereRitem->Geo = mGeometries["shapeGeo"].get();
+	leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+	leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(leftSphereRitem));
 	
-	//Step9
-	auto gridRitem = std::make_unique<RenderItem>();
-	gridRitem->World = MathHelper::Identity4x4();
-	gridRitem->ObjCBIndex = 1;
-	gridRitem->Geo = mGeometries["shapeGeo"].get();
-	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
-	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(gridRitem));
 
-	
-	UINT objCBIndex = 2;
-	for (int i = 0; i < 5; ++i)
-	{
-		auto leftCylRitem = std::make_unique<RenderItem>();
-		auto rightCylRitem = std::make_unique<RenderItem>();
-		auto leftSphereRitem = std::make_unique<RenderItem>();
-		auto rightSphereRitem = std::make_unique<RenderItem>();
-
-		XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
-
-		XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
-
-		XMStoreFloat4x4(&leftCylRitem->World, rightCylWorld);
-		leftCylRitem->ObjCBIndex = objCBIndex++;
-		leftCylRitem->Geo = mGeometries["shapeGeo"].get();
-		leftCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		leftCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		leftCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightCylRitem->World, leftCylWorld);
-		rightCylRitem->ObjCBIndex = objCBIndex++;
-		rightCylRitem->Geo = mGeometries["shapeGeo"].get();
-		rightCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightCylRitem->IndexCount = rightCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		rightCylRitem->StartIndexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		rightCylRitem->BaseVertexLocation = rightCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
-		leftSphereRitem->ObjCBIndex = objCBIndex++;
-		leftSphereRitem->Geo = mGeometries["shapeGeo"].get();
-		leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-		leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightSphereRitem->World, rightSphereWorld);
-		rightSphereRitem->ObjCBIndex = objCBIndex++;
-		rightSphereRitem->Geo = mGeometries["shapeGeo"].get();
-		rightSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightSphereRitem->IndexCount = rightSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-		rightSphereRitem->StartIndexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		rightSphereRitem->BaseVertexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-		mAllRitems.push_back(std::move(leftCylRitem));
-		mAllRitems.push_back(std::move(rightCylRitem));
-		mAllRitems.push_back(std::move(leftSphereRitem));
-		mAllRitems.push_back(std::move(rightSphereRitem));
-	}
-
+	//Build Pyramid
 	auto pyramidRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&pyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(0.0f, 5.f, 0.0f));
-	pyramidRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&pyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-15.0f, 5.f, 5.0f));
+	pyramidRitem->color = XMFLOAT4(DirectX::Colors::Ivory);
+	pyramidRitem->ObjCBIndex = mObjCBIndex++;
 	pyramidRitem->Geo = mGeometries["shapeGeo"].get();
 	pyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	pyramidRitem->IndexCount = pyramidRitem->Geo->DrawArgs["pyramid"].IndexCount;
@@ -968,9 +956,12 @@ void ShapesApp::BuildRenderItems()
 	pyramidRitem->BaseVertexLocation = pyramidRitem->Geo->DrawArgs["pyramid"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(pyramidRitem));
 
+
+	//Build COne
 	auto coneRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&coneRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-5.0f, 5.f, 0.0f));
-	coneRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&coneRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-20.0f, 5.f, 5.0f));
+	coneRitem->color = XMFLOAT4(DirectX::Colors::Black);
+	coneRitem->ObjCBIndex = mObjCBIndex++;
 	coneRitem->Geo = mGeometries["shapeGeo"].get();
 	coneRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	coneRitem->IndexCount = coneRitem->Geo->DrawArgs["cone"].IndexCount;
@@ -978,9 +969,12 @@ void ShapesApp::BuildRenderItems()
 	coneRitem->BaseVertexLocation = coneRitem->Geo->DrawArgs["cone"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(coneRitem));
 
+
+	//Build Diamond
 	auto diamondRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&diamondRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(5.0f, 5.f, 0.0f));
-	diamondRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&diamondRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-25.0f, 5.f, 5.0f));
+	diamondRitem->color = XMFLOAT4(DirectX::Colors::LightPink);
+	diamondRitem->ObjCBIndex = mObjCBIndex++;
 	diamondRitem->Geo = mGeometries["shapeGeo"].get();
 	diamondRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	diamondRitem->IndexCount = diamondRitem->Geo->DrawArgs["diamond"].IndexCount;
@@ -988,9 +982,12 @@ void ShapesApp::BuildRenderItems()
 	diamondRitem->BaseVertexLocation = diamondRitem->Geo->DrawArgs["diamond"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(diamondRitem));
 
+
+	//BUild Wedge
 	auto wedgeRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&wedgeRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(0.0f, 5.f, 5.0f));
-	wedgeRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&wedgeRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(-15.0f, 5.f, 10.0f));
+	wedgeRitem->color = XMFLOAT4(DirectX::Colors::Magenta);
+	wedgeRitem->ObjCBIndex = mObjCBIndex++;
 	wedgeRitem->Geo = mGeometries["shapeGeo"].get();
 	wedgeRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	wedgeRitem->IndexCount = wedgeRitem->Geo->DrawArgs["wedge"].IndexCount;
@@ -998,9 +995,12 @@ void ShapesApp::BuildRenderItems()
 	wedgeRitem->BaseVertexLocation = wedgeRitem->Geo->DrawArgs["wedge"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(wedgeRitem));
 
+
+	//Build halfPyramid
 	auto halfPyramidRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&halfPyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(5.0f, 5.f, 5.0f));
-	halfPyramidRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&halfPyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(-20.0f, 5.f, 10.0f));
+	halfPyramidRitem->color = XMFLOAT4(DirectX::Colors::Blue);
+	halfPyramidRitem->ObjCBIndex = mObjCBIndex++;
 	halfPyramidRitem->Geo = mGeometries["shapeGeo"].get();
 	halfPyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	halfPyramidRitem->IndexCount = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].IndexCount;
@@ -1008,19 +1008,271 @@ void ShapesApp::BuildRenderItems()
 	halfPyramidRitem->BaseVertexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(halfPyramidRitem));
 
+
+	//BUild triSqure
 	auto triSquareRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&triSquareRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(-5.0f, 5.f, 5.0f));
-	triSquareRitem->ObjCBIndex = objCBIndex++;
+	XMStoreFloat4x4(&triSquareRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f)* XMMatrixTranslation(-25.0f, 5.f, 10.0f));
+	triSquareRitem->color = XMFLOAT4(DirectX::Colors::Gold);
+	triSquareRitem->ObjCBIndex = mObjCBIndex++;
 	triSquareRitem->Geo = mGeometries["shapeGeo"].get();
 	triSquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	triSquareRitem->IndexCount = triSquareRitem->Geo->DrawArgs["triSquare"].IndexCount;
 	triSquareRitem->StartIndexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].StartIndexLocation;
 	triSquareRitem->BaseVertexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(triSquareRitem));
+}
 
-	// All the render items are opaque.
-	for (auto& e : mAllRitems)
-		mOpaqueRitems.push_back(e.get());
+void ShapesApp::BuildGround(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//Ground
+	auto ground = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&ground->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+	
+	//World
+	XMStoreFloat4x4(&ground->World,
+		XMLoadFloat4x4(&ground->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	ground->color = XMFLOAT4(DirectX::Colors::Gray);
+
+	ground->ObjCBIndex = mObjCBIndex++;
+	ground->Geo = mGeometries["shapeGeo"].get();
+	ground->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	ground->IndexCount = ground->Geo->DrawArgs["grid"].IndexCount;
+	ground->StartIndexLocation = ground->Geo->DrawArgs["grid"].StartIndexLocation;
+	ground->BaseVertexLocation = ground->Geo->DrawArgs["grid"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(ground));
+
+
+	//Water
+	auto water = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&water->World, XMMatrixScaling(1.0f, 1.0f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, -6.5f));
+
+	//World
+	XMStoreFloat4x4(&water->World,
+		XMLoadFloat4x4(&water->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	water->color = XMFLOAT4(DirectX::Colors::Aqua);
+
+	water->ObjCBIndex = mObjCBIndex++;
+	water->Geo = mGeometries["shapeGeo"].get();
+	water->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	water->IndexCount = water->Geo->DrawArgs["grid"].IndexCount;
+	water->StartIndexLocation = water->Geo->DrawArgs["grid"].StartIndexLocation;
+	water->BaseVertexLocation = water->Geo->DrawArgs["grid"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(water));
+}
+
+void ShapesApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//Main Box
+	auto mainBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&mainBox->World, XMMatrixScaling(3.0f, 2.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&mainBox->World,
+		XMLoadFloat4x4(&mainBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	mainBox->color = XMFLOAT4(DirectX::Colors::White);
+
+	mainBox->ObjCBIndex = mObjCBIndex++;
+	mainBox->Geo = mGeometries["shapeGeo"].get();
+	mainBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	mainBox->IndexCount = mainBox->Geo->DrawArgs["box"].IndexCount;
+	mainBox->StartIndexLocation = mainBox->Geo->DrawArgs["box"].StartIndexLocation;
+	mainBox->BaseVertexLocation = mainBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(mainBox));
+
+
+	//Top Box
+	auto topBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&topBox->World, XMMatrixScaling(1.0f, 1.0f, 0.6f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, 0.2f));
+
+	//World
+	XMStoreFloat4x4(&topBox->World,
+		XMLoadFloat4x4(&topBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	topBox->color = XMFLOAT4(DirectX::Colors::Red);
+
+	topBox->ObjCBIndex = mObjCBIndex++;
+	topBox->Geo = mGeometries["shapeGeo"].get();
+	topBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	topBox->IndexCount = topBox->Geo->DrawArgs["box"].IndexCount;
+	topBox->StartIndexLocation = topBox->Geo->DrawArgs["box"].StartIndexLocation;
+	topBox->BaseVertexLocation = topBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(topBox));
+
+	//Left BIg Box
+	auto leftBigBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&leftBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, 1.f, 0.3f));
+
+	//World
+	XMStoreFloat4x4(&leftBigBox->World,
+		XMLoadFloat4x4(&leftBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	leftBigBox->color = XMFLOAT4(DirectX::Colors::Red);
+
+	leftBigBox->ObjCBIndex = mObjCBIndex++;
+	leftBigBox->Geo = mGeometries["shapeGeo"].get();
+	leftBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftBigBox->IndexCount = leftBigBox->Geo->DrawArgs["box"].IndexCount;
+	leftBigBox->StartIndexLocation = leftBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftBigBox->BaseVertexLocation = leftBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(leftBigBox));
+
+
+	//Right BIg Box
+	auto rightBigBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&rightBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 1.f, 0.3f));
+
+	//World
+	XMStoreFloat4x4(&rightBigBox->World,
+		XMLoadFloat4x4(&rightBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	rightBigBox->color = XMFLOAT4(DirectX::Colors::Red);
+
+	rightBigBox->ObjCBIndex = mObjCBIndex++;
+	rightBigBox->Geo = mGeometries["shapeGeo"].get();
+	rightBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightBigBox->IndexCount = rightBigBox->Geo->DrawArgs["box"].IndexCount;
+	rightBigBox->StartIndexLocation = rightBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightBigBox->BaseVertexLocation = rightBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(rightBigBox));
+
+
+	//left small Box
+	auto leftSmallBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&leftSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(-2.0f, -0.5f, -0.6f));
+
+	//World
+	XMStoreFloat4x4(&leftSmallBox->World,
+		XMLoadFloat4x4(&leftSmallBox->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	leftSmallBox->color = XMFLOAT4(DirectX::Colors::White);
+
+	leftSmallBox->ObjCBIndex = mObjCBIndex++;
+	leftSmallBox->Geo = mGeometries["shapeGeo"].get();
+	leftSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftSmallBox->IndexCount = leftSmallBox->Geo->DrawArgs["box"].IndexCount;
+	leftSmallBox->StartIndexLocation = leftSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftSmallBox->BaseVertexLocation = leftSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(leftSmallBox));
+
+
+	//right small Box
+	auto rightSmallBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&rightSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(2.0f, -0.5f, -0.6f));
+
+	//World
+	XMStoreFloat4x4(&rightSmallBox->World,
+		XMLoadFloat4x4(&rightSmallBox->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	rightSmallBox->color = XMFLOAT4(DirectX::Colors::White);
+
+	rightSmallBox->ObjCBIndex = mObjCBIndex++;
+	rightSmallBox->Geo = mGeometries["shapeGeo"].get();
+	rightSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightSmallBox->IndexCount = rightSmallBox->Geo->DrawArgs["box"].IndexCount;
+	rightSmallBox->StartIndexLocation = rightSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightSmallBox->BaseVertexLocation = rightSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(rightSmallBox));
+
+	
+	//Cross Vertical Box
+	auto crossVerticalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossVerticalBox->World, XMMatrixScaling(0.7f, 0.2f, 0.1f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossVerticalBox->World,
+		XMLoadFloat4x4(&crossVerticalBox->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	crossVerticalBox->color = XMFLOAT4(DirectX::Colors::Green);
+
+	crossVerticalBox->ObjCBIndex = mObjCBIndex++;
+	crossVerticalBox->Geo = mGeometries["shapeGeo"].get();
+	crossVerticalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossVerticalBox->IndexCount = crossVerticalBox->Geo->DrawArgs["box"].IndexCount;
+	crossVerticalBox->StartIndexLocation = crossVerticalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossVerticalBox->BaseVertexLocation = crossVerticalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(crossVerticalBox));
+
+
+	//Cross Horizontal Box
+	auto crossHorizontalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossHorizontalBox->World, XMMatrixScaling(0.2f, 0.7f, 0.1f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossHorizontalBox->World,
+		XMLoadFloat4x4(&crossHorizontalBox->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	crossHorizontalBox->color = XMFLOAT4(DirectX::Colors::Green);
+
+	crossHorizontalBox->ObjCBIndex = mObjCBIndex++;
+	crossHorizontalBox->Geo = mGeometries["shapeGeo"].get();
+	crossHorizontalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossHorizontalBox->IndexCount = crossHorizontalBox->Geo->DrawArgs["box"].IndexCount;
+	crossHorizontalBox->StartIndexLocation = crossHorizontalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossHorizontalBox->BaseVertexLocation = crossHorizontalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(crossHorizontalBox));
 }
 
 void ShapesApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
