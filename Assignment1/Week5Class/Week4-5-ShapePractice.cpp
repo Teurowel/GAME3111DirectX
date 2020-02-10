@@ -1908,9 +1908,9 @@ void ShapesApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
-	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
-	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(firstBuilding));
 
 
