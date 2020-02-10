@@ -86,6 +86,8 @@ private:
 	void BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void Tower(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
@@ -599,7 +601,7 @@ void ShapesApp::BuildShapeGeometry()
 	//Step1
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 10, 10);
 	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
-	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
+	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.5f, 3.0f, 20, 20);
 	GeometryGenerator::MeshData pyramid = geoGen.CreatePyramid(1, 1, 1, 0);
 	GeometryGenerator::MeshData cone = geoGen.CreateCone(1.f, 1.f, 40, 6);
 	GeometryGenerator::MeshData diamond = geoGen.CreateDiamond(1, 2, 1, 0);
@@ -903,6 +905,9 @@ void ShapesApp::BuildRenderItems()
 	BuildWaterBuilding(XMVectorSet(-10.f, 1.5f, -11.f, 0.f));
 	BuildTwoBuildings(XMVectorSet(5.f, 5.f, 12.f, 0.f));
 	BuildStrangeBuildings(XMVectorSet(12.f, 2.f, 2.f, 0.f));
+	BuildSquareBuilding(XMVectorSet(12.f, 2.f, -11.f, 0.f));
+	Tower(XMVectorSet(0.f, 0.f, 0.f, 0.f));
+
 
 	// All the render items are opaque.
 	for (auto& e : mAllRitems)
@@ -1708,6 +1713,210 @@ void ShapesApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 	mAllRitems.push_back(std::move(longFloor));
 
 }
+
+void ShapesApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//1st Building
+	auto firstBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(5.0f, 5.0f, 5.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, 0.5f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&firstBuilding->World,
+		XMLoadFloat4x4(&firstBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	firstBuilding->color = XMFLOAT4(DirectX::Colors::DarkGray);
+
+	firstBuilding->ObjCBIndex = mObjCBIndex++;
+	firstBuilding->Geo = mGeometries["shapeGeo"].get();
+	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(firstBuilding));
+
+	//Deco 1
+	auto deco1 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco1->World, XMMatrixScaling(3.0f, 0.5f, 0.5f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-3.0f, -0.5f, -2.5f));
+
+	//World
+	XMStoreFloat4x4(&deco1->World,
+		XMLoadFloat4x4(&deco1->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco1->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco1->ObjCBIndex = mObjCBIndex++;
+	deco1->Geo = mGeometries["shapeGeo"].get();
+	deco1->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco1->IndexCount = deco1->Geo->DrawArgs["box"].IndexCount;
+	deco1->StartIndexLocation = deco1->Geo->DrawArgs["box"].StartIndexLocation;
+	deco1->BaseVertexLocation = deco1->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco1));
+
+
+	//Deco 2
+	auto deco2 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco2->World, XMMatrixScaling(0.5f, 1.5f, 0.5f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-1.725f, 0.5f, -2.5f));
+
+	//World
+	XMStoreFloat4x4(&deco2->World,
+		XMLoadFloat4x4(&deco2->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco2->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco2->ObjCBIndex = mObjCBIndex++;
+	deco2->Geo = mGeometries["shapeGeo"].get();
+	deco2->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco2->IndexCount = deco2->Geo->DrawArgs["box"].IndexCount;
+	deco2->StartIndexLocation = deco2->Geo->DrawArgs["box"].StartIndexLocation;
+	deco2->BaseVertexLocation = deco2->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco2));
+
+	//Deco 3
+	auto deco3 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco3->World, XMMatrixScaling(2.0f, 0.5f, 0.5f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.5f, 1.5f, -2.5f));
+
+	//World
+	XMStoreFloat4x4(&deco3->World,
+		XMLoadFloat4x4(&deco3->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco3->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco3->ObjCBIndex = mObjCBIndex++;
+	deco3->Geo = mGeometries["shapeGeo"].get();
+	deco3->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco3->IndexCount = deco3->Geo->DrawArgs["box"].IndexCount;
+	deco3->StartIndexLocation = deco3->Geo->DrawArgs["box"].StartIndexLocation;
+	deco3->BaseVertexLocation = deco3->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco3));
+
+	//Deco 4
+	auto deco4 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco4->World, XMMatrixScaling(0.5f, 0.5f, 3.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation (- 4.5f, -0.5f, -1.f));
+
+	//World
+	XMStoreFloat4x4(&deco4->World,
+		XMLoadFloat4x4(&deco4->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco4->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco4->ObjCBIndex = mObjCBIndex++;
+	deco4->Geo = mGeometries["shapeGeo"].get();
+	deco4->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco4->IndexCount = deco4->Geo->DrawArgs["box"].IndexCount;
+	deco4->StartIndexLocation = deco4->Geo->DrawArgs["box"].StartIndexLocation;
+	deco4->BaseVertexLocation = deco4->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco4));
+
+	//Deco 5
+	auto deco5 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco5->World, XMMatrixScaling(0.5f, 1.5f, 0.5f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(-4.5f, 0.5f, 0.25f));
+
+	//World
+	XMStoreFloat4x4(&deco5->World,
+		XMLoadFloat4x4(&deco5->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco5->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco5->ObjCBIndex = mObjCBIndex++;
+	deco5->Geo = mGeometries["shapeGeo"].get();
+	deco5->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco5->IndexCount = deco5->Geo->DrawArgs["box"].IndexCount;
+	deco5->StartIndexLocation = deco5->Geo->DrawArgs["box"].StartIndexLocation;
+	deco5->BaseVertexLocation = deco5->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco5));
+
+	//Deco 6
+	auto deco6 = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&deco6->World, XMMatrixScaling(0.5f, 0.5f, 2.0f)* XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f)* XMMatrixTranslation(-4.5f, 1.5f, -0.5f));
+
+	//World
+	XMStoreFloat4x4(&deco6->World,
+		XMLoadFloat4x4(&deco6->World)*
+		XMMatrixScalingFromVector(scale)*
+		XMMatrixRotationRollPitchYawFromVector(rotation)*
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	deco6->color = XMFLOAT4(DirectX::Colors::DarkSlateGray);
+
+	deco6->ObjCBIndex = mObjCBIndex++;
+	deco6->Geo = mGeometries["shapeGeo"].get();
+	deco6->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco6->IndexCount = deco6->Geo->DrawArgs["box"].IndexCount;
+	deco6->StartIndexLocation = deco6->Geo->DrawArgs["box"].StartIndexLocation;
+	deco6->BaseVertexLocation = deco6->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(deco6));
+
+}
+
+void ShapesApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//1st Building
+	auto firstBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&firstBuilding->World,
+		XMLoadFloat4x4(&firstBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Color
+	firstBuilding->color = XMFLOAT4(DirectX::Colors::DarkBlue);
+
+	firstBuilding->ObjCBIndex = mObjCBIndex++;
+	firstBuilding->Geo = mGeometries["shapeGeo"].get();
+	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(firstBuilding));
+
+
+}
+
+
 
 void ShapesApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
