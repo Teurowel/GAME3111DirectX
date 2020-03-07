@@ -1,13 +1,14 @@
 //***************************************************************************************
+// LightingUtil.hlsl by Frank Luna (C) 2015 All Rights Reserved.
+//
 // Contains API for shader lighting.
 //***************************************************************************************
 
-//Putting the Light array in the per-pass constant buffer means we cannot have more than sixteen(the maximum number of lights we support) lights per rendering pass.
 #define MaxLights 16
 
 struct Light
 {
-    float3 Strength;    // Light color
+    float3 Strength;
     float FalloffStart; // point/spot light only
     float3 Direction;   // directional/spot light only
     float FalloffEnd;   // point/spot light only
