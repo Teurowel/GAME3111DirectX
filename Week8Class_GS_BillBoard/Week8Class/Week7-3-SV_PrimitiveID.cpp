@@ -1,6 +1,8 @@
 //***************************************************************************************
-//  Billboard. We expand each point into a quad (4 vertices) using Geometry shader
-//The input primitive is a point. The output is a triangle strip.
+//We determine the color in the pixel shader using SV_PrimitiveID
+//If a geometry shader is no present, the primitive ID parameter can be added to
+//the parameter list of the pixelshader:
+//float4 PS(VertexOut pin, uint primID : SV_PrimitiveID) : SV_Target
 //***************************************************************************************
 
 #include "../../Common/d3dApp.h"
@@ -16,7 +18,6 @@ struct Vertex
 {
 	XMFLOAT3 Pos;
 	XMFLOAT4 Color;
-	XMFLOAT2 Size;
 };
 
 
@@ -61,7 +62,6 @@ private:
 	//The ID3DBlob interface is used to return data of arbitrary length. It's contained in D3dcompiler.lib 
 	ComPtr<ID3DBlob> mvsByteCode = nullptr;
 	ComPtr<ID3DBlob> mpsByteCode = nullptr;
-	ComPtr<ID3DBlob> mgsByteCode = nullptr;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
@@ -72,9 +72,9 @@ private:
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-	float mTheta = -0.5f * XM_PI;
-	float mPhi = XM_PIDIV2;
-	float mRadius = 10.0f;
+	float mTheta = 1.5f * XM_PI;
+	float mPhi = XM_PIDIV4;
+	float mRadius = 5.0f;
 
 	//step1
 	float mTheta2 = 0.0f;
@@ -175,9 +175,9 @@ void TriangleAPP::Update(const GameTimer& gt)
 
 	XMMATRIX world = XMLoadFloat4x4(&mWorld);
 
-	//step2 a rotation around z axis
-	mTheta2 += gt.DeltaTime()*2.0f;
-	world = XMMatrixRotationX((XM_PI+ mTheta2) );
+	// a rotation around z axis
+	//mTheta2 += 0.1f;
+	//world = XMMatrixRotationZ((-XM_PI+ mTheta2) / 6.0f);
 	//
 
 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
@@ -232,13 +232,12 @@ void TriangleAPP::Draw(const GameTimer& gt)
 	mCommandList->IASetVertexBuffers(0, 1, &mBoxGeo->VertexBufferView());
 	mCommandList->IASetIndexBuffer(&mBoxGeo->IndexBufferView());   //bind it to the pipeline
 
-	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	//bind the constant buffer to the pipeline
 	mCommandList->SetGraphicsRootDescriptorTable(0, mCbvHeap->GetGPUDescriptorHandleForHeapStart());
-	// if you compile the code at this point, there is no build problem. but it doesn't do anything, because the shader is not making a use of it.
 
-	mCommandList->DrawIndexedInstanced(mBoxGeo->DrawArgs["billboard"].IndexCount, 1, 0, 0, 0);
+	mCommandList->DrawIndexedInstanced(mBoxGeo->DrawArgs["triangle"].IndexCount, 1, 0, 0, 0);
 
 
 	// Indicate a state transition on the resource usage.
@@ -315,35 +314,39 @@ void TriangleAPP::BuildShadersAndInputLayout()
 	HRESULT hr = S_OK;
 
 	//when you are adding new shader, make sure you right click, and set shader type and shader model in HLSL compiler 
-
-	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS1.hlsl", nullptr, "VS", "vs_5_1");
-	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS1.hlsl", nullptr, "PS", "ps_5_1");
-	mgsByteCode = d3dUtil::CompileShader(L"Shaders\\GS1.hlsl", nullptr, "GS", "gs_5_1");
+	//step3: refactoring the vertex shader to use structs for both ins and outs parameters
+	//note that I changed "main" to PS and VS
+	mvsByteCode = d3dUtil::CompileShader(L"Shaders\\VS4.hlsl", nullptr, "VS", "vs_5_1");
+	mpsByteCode = d3dUtil::CompileShader(L"Shaders\\PS4.hlsl", nullptr, "PS", "ps_5_1");
 
 	mInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
 void TriangleAPP::BuildTriangleGeometry()
 {
-	std::array<Vertex, 3> vertices =
+	std::array<Vertex, 9> vertices =
 	{
-				Vertex({ XMFLOAT3(0.5f, 0.5f, 0.0f) , XMFLOAT4(Colors::GreenYellow), XMFLOAT2(1.0f, 1.0f)}),
-				Vertex({ XMFLOAT3(-0.5f, 0.0f, 0.0f), XMFLOAT4(Colors::Red), XMFLOAT2(1.0f, 1.0f)}),
-				Vertex({ XMFLOAT3(+0.5f, -0.5f, 0.0f) , XMFLOAT4(Colors::Green), XMFLOAT2(1.0f, 1.0f)}),
-				/*Vertex({ XMFLOAT3(+0.5f, +0.0f, 0.0f) , XMFLOAT4(Colors::Blue) }),
-				Vertex({ XMFLOAT3(+0.0f, -0.5f, 0.0f) , XMFLOAT4(Colors::Pink) }),*/
+		        //We determine the color in the pixel shader using SV_PrimitiveID
+				Vertex({ XMFLOAT3(-0.5f, -0.5f, 0.0f), XMFLOAT4(Colors::Black)}),
+				Vertex({ XMFLOAT3(+0.0f, +0.5f, 0.0f) , XMFLOAT4(Colors::Black) }),
+				Vertex({ XMFLOAT3(+0.5f, -0.5f, 0.0f) , XMFLOAT4(Colors::Black)}),
+				Vertex({ XMFLOAT3(+0.5f, -0.5f, 0.0f) , XMFLOAT4(Colors::Black)}),
+				Vertex({ XMFLOAT3(+0.0f, +0.5f, 0.0f) , XMFLOAT4(Colors::Black) }),
+				Vertex({ XMFLOAT3(+0.5f, +0.5f, 0.0f) , XMFLOAT4(Colors::Black) }),
+				Vertex({ XMFLOAT3(-0.5f, -0.5f, 0.0f), XMFLOAT4(Colors::Black)}),
+				Vertex({ XMFLOAT3(-0.5f, +0.5f, 0.0f) , XMFLOAT4(Colors::Black)}),
+				Vertex({ XMFLOAT3(+0.0f, +0.5f, 0.0f) , XMFLOAT4(Colors::Black) }),
 	};
 
 
-	std::array<std::uint16_t, 3> indices =
+	std::array<std::uint16_t, 9> indices =
 	{
 
-		0,1, 2,// 3 , 4
+		0, 1, 2,3,4,5,6,7,8
 	};
 
 
@@ -376,7 +379,7 @@ void TriangleAPP::BuildTriangleGeometry()
 	submesh.StartIndexLocation = 0;
 	submesh.BaseVertexLocation = 0;
 
-	mBoxGeo->DrawArgs["billboard"] = submesh;
+	mBoxGeo->DrawArgs["triangle"] = submesh;
 
 
 }
@@ -400,23 +403,18 @@ void TriangleAPP::BuildPSO()
 		reinterpret_cast<BYTE*>(mpsByteCode->GetBufferPointer()),
 		mpsByteCode->GetBufferSize()
 	};
-	psoDesc.GS =
-	{
-		reinterpret_cast<BYTE*>(mgsByteCode->GetBufferPointer()),
-		mgsByteCode->GetBufferSize()
-	};
-	
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.SampleMask = UINT_MAX;
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
 	psoDesc.NumRenderTargets = 1;
 	psoDesc.RTVFormats[0] = mBackBufferFormat;  //DXGI_FORMAT_R8G8B8A8_UNORM;
 	psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
 	psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 	psoDesc.DSVFormat = mDepthStencilFormat;
+
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
 }
 

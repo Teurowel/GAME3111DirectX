@@ -14,8 +14,8 @@ struct VertexIn
 struct VertexOut
 {
     float3 CenterW : POSITION;
-    float4 Color : COLOR;
     float2 SizeW : SIZE;
+    float4 Color : COLOR;
 };
 
 VertexOut VS(VertexIn vin)
