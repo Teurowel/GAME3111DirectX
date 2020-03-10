@@ -1,5 +1,5 @@
 //***************************************************************************************
-// LitCarApp.cpp Car + Grid lit using 3 direct lights
+// CrateApp.cpp using Linear Wrap
 //***************************************************************************************
 
 #include "../../Common/d3dApp.h"
@@ -28,6 +28,7 @@ struct RenderItem
     // and scale of the object in the world.
     XMFLOAT4X4 World = MathHelper::Identity4x4();
 
+	XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 
 	// Dirty flag indicating the object data has changed and we need to update the constant buffer.
 	// Because we have an object cbuffer for each FrameResource, we have to apply the
@@ -42,7 +43,7 @@ struct RenderItem
 	MeshGeometry* Geo = nullptr;
 
     // Primitive topology.
-    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     // DrawIndexedInstanced parameters.
     UINT IndexCount = 0;
@@ -50,13 +51,13 @@ struct RenderItem
     int BaseVertexLocation = 0;
 };
 
-class CarApp : public D3DApp
+class CrateApp : public D3DApp
 {
 public:
-    CarApp(HINSTANCE hInstance);
-    CarApp(const CarApp& rhs) = delete;
-    CarApp& operator=(const CarApp& rhs) = delete;
-    ~CarApp();
+    CrateApp(HINSTANCE hInstance);
+    CrateApp(const CrateApp& rhs) = delete;
+    CrateApp& operator=(const CrateApp& rhs) = delete;
+    ~CrateApp();
 
     virtual bool Initialize()override;
 
@@ -71,57 +72,61 @@ private:
 
     void OnKeyboardInput(const GameTimer& gt);
 	void UpdateCamera(const GameTimer& gt);
+	void AnimateMaterials(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
-
+	void LoadTextures();
     void BuildRootSignature();
+	void BuildDescriptorHeaps();
     void BuildShadersAndInputLayout();
-	//step1
-	void BuildShapeGeometry();
-
-	void BuildCarGeometry();
+    void BuildShapeGeometry();
     void BuildPSOs();
     void BuildFrameResources();
     void BuildMaterials();
-
     void BuildRenderItems();
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
- 
+
+	//step3
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
+
 private:
 
     std::vector<std::unique_ptr<FrameResource>> mFrameResources;
     FrameResource* mCurrFrameResource = nullptr;
     int mCurrFrameResourceIndex = 0;
 
+    UINT mCbvSrvDescriptorSize = 0;
+
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
+
+	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
 
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> mGeometries;
 	std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials;
+	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
+
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
-    //ComPtr<ID3D12PipelineState> mOpaquePSO = nullptr;
-	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
+    ComPtr<ID3D12PipelineState> mOpaquePSO = nullptr;
  
 	// List of all the render items.
 	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
 
 	// Render items divided by PSO.
 	std::vector<RenderItem*> mOpaqueRitems;
-	std::vector<RenderItem*> mTransparentRitems;
 
     PassConstants mMainPassCB;
-	bool mIsWireframe = false;
 
 	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-    float mTheta = 1.5f*XM_PI;
-    float mPhi = 0.4f*XM_PI;
-    float mRadius = 15.0f;
+	float mTheta = 1.3f*XM_PI;
+	float mPhi = 0.4f*XM_PI;
+	float mRadius = 2.5f;
 
     POINT mLastMousePos;
 };
@@ -136,7 +141,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
     try
     {
-        CarApp theApp(hInstance);
+        CrateApp theApp(hInstance);
         if(!theApp.Initialize())
             return 0;
 
@@ -149,18 +154,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
     }
 }
 
-CarApp::CarApp(HINSTANCE hInstance)
+CrateApp::CrateApp(HINSTANCE hInstance)
     : D3DApp(hInstance)
 {
 }
 
-CarApp::~CarApp()
+CrateApp::~CrateApp()
 {
     if(md3dDevice != nullptr)
         FlushCommandQueue();
 }
 
-bool CarApp::Initialize()
+bool CrateApp::Initialize()
 {
     if(!D3DApp::Initialize())
         return false;
@@ -168,16 +173,18 @@ bool CarApp::Initialize()
     // Reset the command list to prep for initialization commands.
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
+    // Get the increment size of a descriptor in this heap type.  This is hardware specific, 
+	// so we have to query this information.
+    mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	LoadTextures();
 
     BuildRootSignature();
+	BuildDescriptorHeaps();
+
     BuildShadersAndInputLayout();
-	
-	//step2
-	BuildShapeGeometry();
-
-	BuildCarGeometry();
+    BuildShapeGeometry();
 	BuildMaterials();
-
     BuildRenderItems();
     BuildFrameResources();
     BuildPSOs();
@@ -193,7 +200,7 @@ bool CarApp::Initialize()
     return true;
 }
  
-void CarApp::OnResize()
+void CrateApp::OnResize()
 {
     D3DApp::OnResize();
 
@@ -202,7 +209,7 @@ void CarApp::OnResize()
     XMStoreFloat4x4(&mProj, P);
 }
 
-void CarApp::Update(const GameTimer& gt)
+void CrateApp::Update(const GameTimer& gt)
 {
     OnKeyboardInput(gt);
 	UpdateCamera(gt);
@@ -221,13 +228,13 @@ void CarApp::Update(const GameTimer& gt)
         CloseHandle(eventHandle);
     }
 
-
+	AnimateMaterials(gt);
 	UpdateObjectCBs(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
 }
 
-void CarApp::Draw(const GameTimer& gt)
+void CrateApp::Draw(const GameTimer& gt)
 {
     auto cmdListAlloc = mCurrFrameResource->CmdListAlloc;
 
@@ -237,16 +244,7 @@ void CarApp::Draw(const GameTimer& gt)
 
     // A command list can be reset after it has been added to the command queue via ExecuteCommandList.
     // Reusing the command list reuses memory.
-    //ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSO.Get()));
-
-	if (mIsWireframe)
-	{
-		ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque_wireframe"].Get()));
-	}
-	else
-	{
-		ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
-	}
+    ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mOpaquePSO.Get()));
 
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
@@ -256,11 +254,14 @@ void CarApp::Draw(const GameTimer& gt)
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     // Clear the back buffer and depth buffer.
-    mCommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::Black, 0, nullptr);
+    mCommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::LightSteelBlue, 0, nullptr);
     mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
     // Specify the buffers we are going to render to.
     mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mSrvDescriptorHeap.Get() };
+	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
@@ -268,12 +269,6 @@ void CarApp::Draw(const GameTimer& gt)
 	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
 
     DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
-
-	//mCommandList->SetPipelineState(mPSOs["opaque_wireframe"].Get());
-	//DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
-
-	//mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-	//DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
 
     // Indicate a state transition on the resource usage.
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -299,7 +294,7 @@ void CarApp::Draw(const GameTimer& gt)
     mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
-void CarApp::OnMouseDown(WPARAM btnState, int x, int y)
+void CrateApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
     mLastMousePos.x = x;
     mLastMousePos.y = y;
@@ -307,12 +302,12 @@ void CarApp::OnMouseDown(WPARAM btnState, int x, int y)
     SetCapture(mhMainWnd);
 }
 
-void CarApp::OnMouseUp(WPARAM btnState, int x, int y)
+void CrateApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
     ReleaseCapture();
 }
 
-void CarApp::OnMouseMove(WPARAM btnState, int x, int y)
+void CrateApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
     if((btnState & MK_LBUTTON) != 0)
     {
@@ -344,15 +339,11 @@ void CarApp::OnMouseMove(WPARAM btnState, int x, int y)
     mLastMousePos.y = y;
 }
  
-void CarApp::OnKeyboardInput(const GameTimer& gt)
+void CrateApp::OnKeyboardInput(const GameTimer& gt)
 {
-	if (GetAsyncKeyState('1') & 0x8000)
-		mIsWireframe = true;
-	else
-		mIsWireframe = false;
 }
  
-void CarApp::UpdateCamera(const GameTimer& gt)
+void CrateApp::UpdateCamera(const GameTimer& gt)
 {
 	// Convert Spherical to Cartesian coordinates.
 	mEyePos.x = mRadius*sinf(mPhi)*cosf(mTheta);
@@ -368,9 +359,12 @@ void CarApp::UpdateCamera(const GameTimer& gt)
 	XMStoreFloat4x4(&mView, view);
 }
 
+void CrateApp::AnimateMaterials(const GameTimer& gt)
+{
+	
+}
 
-
-void CarApp::UpdateObjectCBs(const GameTimer& gt)
+void CrateApp::UpdateObjectCBs(const GameTimer& gt)
 {
 	auto currObjectCB = mCurrFrameResource->ObjectCB.get();
 	for(auto& e : mAllRitems)
@@ -380,9 +374,11 @@ void CarApp::UpdateObjectCBs(const GameTimer& gt)
 		if(e->NumFramesDirty > 0)
 		{
 			XMMATRIX world = XMLoadFloat4x4(&e->World);
+			XMMATRIX texTransform = XMLoadFloat4x4(&e->TexTransform);
 
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
+			XMStoreFloat4x4(&objConstants.TexTransform, XMMatrixTranspose(texTransform));
 
 			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
 
@@ -392,7 +388,7 @@ void CarApp::UpdateObjectCBs(const GameTimer& gt)
 	}
 }
 
-void CarApp::UpdateMaterialCBs(const GameTimer& gt)
+void CrateApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = mCurrFrameResource->MaterialCB.get();
 	for(auto& e : mMaterials)
@@ -418,7 +414,7 @@ void CarApp::UpdateMaterialCBs(const GameTimer& gt)
 	}
 }
 
-void CarApp::UpdateMainPassCB(const GameTimer& gt)
+void CrateApp::UpdateMainPassCB(const GameTimer& gt)
 {
 	XMMATRIX view = XMLoadFloat4x4(&mView);
 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
@@ -441,124 +437,156 @@ void CarApp::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.FarZ = 1000.0f;
 	mMainPassCB.TotalTime = gt.TotalTime();
 	mMainPassCB.DeltaTime = gt.DeltaTime();
-
-	//step1
 	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
-
-	mMainPassCB.Lights[0].Direction = { 1.f, 1.f, 0.f };
+	mMainPassCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
 	mMainPassCB.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
-	//mMainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
-	//mMainPassCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
-	//mMainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
-	//mMainPassCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
-
-
-	//spot light
-	//mMainPassCB.Lights[0].Position = { 0.0f, 5.0f, -3.0f };
-	//mMainPassCB.Lights[0].Direction = { 0.0f, -5.0f, 3.0f };
-	//mMainPassCB.Lights[0].Strength = { 0.95f, 0.95f, 0.95f };   
-	//mMainPassCB.Lights[0].SpotPower = 1.0;
+	mMainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
+	mMainPassCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
+	mMainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
+	mMainPassCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
 }
 
-void CarApp::BuildRootSignature()
+void CrateApp::LoadTextures()
 {
-	// Root parameter can be a table, root descriptor or root constants.
-	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-
-	// Create root CBV.
-	slotRootParameter[0].InitAsConstantBufferView(0);
-	slotRootParameter[1].InitAsConstantBufferView(1);
-	slotRootParameter[2].InitAsConstantBufferView(2);
-
-	// A root signature is an array of root parameters.
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
-	ComPtr<ID3DBlob> serializedRootSig = nullptr;
-	ComPtr<ID3DBlob> errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-
-	if(errorBlob != nullptr)
-	{
-		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-	}
-	ThrowIfFailed(hr);
-
-	ThrowIfFailed(md3dDevice->CreateRootSignature(
-		0,
-		serializedRootSig->GetBufferPointer(),
-		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(mRootSignature.GetAddressOf())));
+	auto woodCrateTex = std::make_unique<Texture>();
+	woodCrateTex->Name = "woodCrateTex";
+	woodCrateTex->Filename = L"../../Textures/WoodCrate01.dds";
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), woodCrateTex->Filename.c_str(),
+		woodCrateTex->Resource, woodCrateTex->UploadHeap));
+ 
+	mTextures[woodCrateTex->Name] = std::move(woodCrateTex);
 }
 
-void CarApp::BuildShadersAndInputLayout()
+void CrateApp::BuildRootSignature()
 {
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\VS.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\PS.hlsl", nullptr, "PS", "ps_5_1");
+    // Root parameter can be a table, root descriptor or root constants.
+    CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+
+	// Perfomance TIP: Order from most frequent to least frequent.
+	slotRootParameter[0].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
+    slotRootParameter[1].InitAsConstantBufferView(0);
+    slotRootParameter[2].InitAsConstantBufferView(1);
+    slotRootParameter[3].InitAsConstantBufferView(2);
+
+	auto staticSamplers = GetStaticSamplers();
+
+    // A root signature is an array of root parameters.
+	//The Init function of the CD3DX12_ROOT_SIGNATURE_DESC class has two parameters that allow you to
+		//define an array of so - called static samplers your application can use.
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
+		(UINT)staticSamplers.size(), staticSamplers.data(),  //6 samplers!
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    // create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
+    ComPtr<ID3DBlob> serializedRootSig = nullptr;
+    ComPtr<ID3DBlob> errorBlob = nullptr;
+    HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+        serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+    if(errorBlob != nullptr)
+    {
+        ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+    }
+    ThrowIfFailed(hr);
+
+    ThrowIfFailed(md3dDevice->CreateRootSignature(
+		0,
+        serializedRootSig->GetBufferPointer(),
+        serializedRootSig->GetBufferSize(),
+        IID_PPV_ARGS(mRootSignature.GetAddressOf())));
+}
+
+//Once a texture resource is created, we need to create an SRV descriptor to it which we
+//can set to a root signature parameter slot for use by the shader programs.
+void CrateApp::BuildDescriptorHeaps()
+{
+	//
+	// Create the SRV heap.
+	//
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.NumDescriptors = 1;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
+
+	//
+	// Fill out the heap with actual descriptors.
+	//
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+	auto woodCrateTex = mTextures["woodCrateTex"]->Resource;
+ 
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+	//This mapping enables the shader resource view (SRV) to choose how memory gets routed to the 4 return components in a shader after a memory fetch.
+	//When a texture is sampled in a shader, it will return a vector of the texture data at the specified texture coordinates.
+	//This field provides a way to reorder the vector components returned when sampling the texture.
+	//D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING  will not reorder the components and just return the data in the order it is stored in the texture resource.
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	srvDesc.Format = woodCrateTex->GetDesc().Format;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	//The number of mipmap levels to view, starting at MostDetailedMip.This field, along with MostDetailedMip allows us to
+	//specify a subrange of mipmap levels to view.You can specify - 1 to indicate to view
+	//all mipmap levels from MostDetailedMip down to the last mipmap level.
+
+	srvDesc.Texture2D.MipLevels = woodCrateTex->GetDesc().MipLevels;
+
+	//Specifies the minimum mipmap level that can be accessed. 0.0 means all the mipmap levels can be accessed.
+	//Specifying 3.0 means mipmap levels 3.0 to MipCount - 1 can be accessed.
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+	md3dDevice->CreateShaderResourceView(woodCrateTex.Get(), &srvDesc, hDescriptor);
+}
+
+void CrateApp::BuildShadersAndInputLayout()
+{
+	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default_Border.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default_Border.hlsl", nullptr, "PS", "ps_5_1");
 	
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 }
 
-//step3
-void CarApp::BuildShapeGeometry()
+void CrateApp::BuildShapeGeometry()
 {
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
+    GeometryGenerator geoGen;
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3);
+ 
+	SubmeshGeometry boxSubmesh;
+	boxSubmesh.IndexCount = (UINT)box.Indices32.size();
+	boxSubmesh.StartIndexLocation = 0;
+	boxSubmesh.BaseVertexLocation = 0;
 
-	//
-	// We are concatenating all the geometry into one big vertex/index buffer.  So
-	// define the regions in the buffer each submesh covers.
-	//
+ 
+	std::vector<Vertex> vertices(box.Vertices.size());
 
-	// Cache the vertex offsets to each object in the concatenated vertex buffer.
-	UINT gridVertexOffset = 0;
-
-
-	// Cache the starting index for each object in the concatenated index buffer.
-	UINT gridIndexOffset = 0;
-
-
-	SubmeshGeometry gridSubmesh;
-	gridSubmesh.IndexCount = (UINT)grid.Indices32.size();
-	gridSubmesh.StartIndexLocation = gridIndexOffset;
-	gridSubmesh.BaseVertexLocation = gridVertexOffset;
-
-	//
-	// Extract the vertex elements we are interested in and pack the
-	// vertices of all the meshes into one vertex buffer.
-	//
-
-	auto totalVertexCount =grid.Vertices.size();
-
-	std::vector<Vertex> vertices(totalVertexCount);
-
-	UINT k = 0;
-
-	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
+	for(size_t i = 0; i < box.Vertices.size(); ++i)
 	{
-		vertices[k].Pos = grid.Vertices[i].Position;
-		vertices[k].Normal = grid.Vertices[i].Normal;
+		vertices[i].Pos = box.Vertices[i].Position;
+		vertices[i].Normal = box.Vertices[i].Normal;
+		vertices[i].TexC = box.Vertices[i].TexC;
 	}
 
+	std::vector<std::uint16_t> indices = box.GetIndices16();
 
-
-	std::vector<std::uint16_t> indices;
-	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+    const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+    const UINT ibByteSize = (UINT)indices.size()  * sizeof(std::uint16_t);
 
 	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "shapeGeo";
+	geo->Name = "boxGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
@@ -577,87 +605,12 @@ void CarApp::BuildShapeGeometry()
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	geo->DrawArgs["grid"] = gridSubmesh;
+	geo->DrawArgs["box"] = boxSubmesh;
 
 	mGeometries[geo->Name] = std::move(geo);
 }
 
-void CarApp::BuildCarGeometry()
-{
-	std::ifstream fin("Models/car.txt");
-
-	if(!fin)
-	{
-		MessageBox(0, L"Models/car.txt not found.", 0, 0);
-		return;
-	}
-
-	UINT vcount = 0;
-	UINT tcount = 0;
-	std::string ignore;
-
-	fin >> ignore >> vcount;
-	fin >> ignore >> tcount;
-	fin >> ignore >> ignore >> ignore >> ignore;
-
-	std::vector<Vertex> vertices(vcount);
-	for(UINT i = 0; i < vcount; ++i)
-	{
-		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
-		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
-	}
-
-	fin >> ignore;
-	fin >> ignore;
-	fin >> ignore;
-
-	std::vector<std::int32_t> indices(3 * tcount);
-	for(UINT i = 0; i < tcount; ++i)
-	{
-		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
-	}
-
-	fin.close();
-
-	//
-	// Pack the indices of all the meshes into one index buffer.
-	//
-
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::int32_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "carGeo";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R32_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["car"] = submesh;
-
-	mGeometries[geo->Name] = std::move(geo);
-}
-
-void CarApp::BuildPSOs()
+void CrateApp::BuildPSOs()
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 
@@ -687,19 +640,10 @@ void CarApp::BuildPSOs()
 	opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
 	opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
-
-	//
-	// PSO for opaque wireframe objects.
-	//
-
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
-	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["opaque_wireframe"])));
-
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mOpaquePSO)));
 }
 
-void CarApp::BuildFrameResources()
+void CrateApp::BuildFrameResources()
 {
     for(int i = 0; i < gNumFrameResources; ++i)
     {
@@ -708,63 +652,43 @@ void CarApp::BuildFrameResources()
     }
 }
 
-void CarApp::BuildMaterials()
+void CrateApp::BuildMaterials()
 {
-	auto carMat = std::make_unique<Material>();
-	carMat->Name = "carMat";
-	carMat->MatCBIndex = 0;
-	carMat->DiffuseAlbedo = XMFLOAT4(212.0f / 255.0f, 175.0f / 255.0f, 55.0 / 255.0f, 1.0);   //rgb(212,175,55) metalic gold
-	carMat->FresnelR0 = XMFLOAT3(1.0f, 0.71f, 0.29f);  //Gold Fresnel
-	carMat->Roughness = 0.0f;
-	mMaterials["carMat"] = std::move(carMat);
+	auto woodCrate = std::make_unique<Material>();
+	woodCrate->Name = "woodCrate";
+	woodCrate->MatCBIndex = 0;
+	woodCrate->DiffuseSrvHeapIndex = 0;
+	woodCrate->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	woodCrate->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	woodCrate->Roughness = 0.2f;
 
-	//step4
-	auto tile0 = std::make_unique<Material>();
-	tile0->Name = "tile0";
-	tile0->MatCBIndex = 1;
-	tile0->DiffuseAlbedo = XMFLOAT4(Colors::BlanchedAlmond);
-	tile0->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	tile0->Roughness = 0.2f;
-	mMaterials["tile0"] = std::move(tile0);
+	mMaterials["woodCrate"] = std::move(woodCrate);
 }
 
-void CarApp::BuildRenderItems()
+void CrateApp::BuildRenderItems()
 {
+	auto boxRitem = std::make_unique<RenderItem>();
+	//step1
+	boxRitem->World = MathHelper::Identity4x4();
+	//XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(1.0f, 0.0f, 0.0f));
+	//XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
 
-	auto carRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&carRitem->World, XMMatrixScaling(0.5f, 0.5f, 0.5f)*XMMatrixTranslation(0.0f, 1.0f, 0.0f));
 
-	carRitem->ObjCBIndex = 0;
-	carRitem->Mat = mMaterials["carMat"].get();
-	carRitem->Geo = mGeometries["carGeo"].get();
-	carRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	carRitem->IndexCount = carRitem->Geo->DrawArgs["car"].IndexCount;
-	carRitem->StartIndexLocation = carRitem->Geo->DrawArgs["car"].StartIndexLocation;
-	carRitem->BaseVertexLocation = carRitem->Geo->DrawArgs["car"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(carRitem));
-
-	//step5
-	auto gridRitem = std::make_unique<RenderItem>();
-	gridRitem->World = MathHelper::Identity4x4();
-	XMStoreFloat4x4(&gridRitem->World, XMMatrixScaling(8.0f, 8.0f, 1.0f));
-	gridRitem->ObjCBIndex = 1;
-	gridRitem->Mat = mMaterials["tile0"].get();
-	gridRitem->Geo = mGeometries["shapeGeo"].get();
-	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
-	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(gridRitem));
-
-	//mOpaqueRitems.push_back(car)
-
+	boxRitem->ObjCBIndex = 0;
+	boxRitem->Mat = mMaterials["woodCrate"].get();
+	boxRitem->Geo = mGeometries["boxGeo"].get();
+	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(boxRitem));
 
 	// All the render items are opaque.
 	for(auto& e : mAllRitems)
 		mOpaqueRitems.push_back(e.get());
 }
 
-void CarApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+void CrateApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
     UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
     UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
@@ -781,12 +705,118 @@ void CarApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vect
         cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
         cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
+		CD3DX12_GPU_DESCRIPTOR_HANDLE tex(mSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		tex.Offset(ri->Mat->DiffuseSrvHeapIndex, mCbvSrvDescriptorSize);
+
         D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex*objCBByteSize;
 		D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + ri->Mat->MatCBIndex*matCBByteSize;
 
-        cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
-		cmdList->SetGraphicsRootConstantBufferView(1, matCBAddress);
+		cmdList->SetGraphicsRootDescriptorTable(0, tex);
+        cmdList->SetGraphicsRootConstantBufferView(1, objCBAddress);
+        cmdList->SetGraphicsRootConstantBufferView(3, matCBAddress);
 
         cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
     }
 }
+
+//step4
+//CD3DX12_STATIC_SAMPLER_DESC(
+//	UINT shaderRegister,
+//	D3D12_FILTER filter = D3D12_FILTER_ANISOTROPIC,
+//	D3D12_TEXTURE_ADDRESS_MODE addressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+//	D3D12_TEXTURE_ADDRESS_MODE addressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+//	D3D12_TEXTURE_ADDRESS_MODE addressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+//	FLOAT mipLODBias = 0,
+//	UINT maxAnisotropy = 16,
+//	D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL,
+//	D3D12_STATIC_BORDER_COLOR borderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
+//	FLOAT minLOD = 0.f,
+//	FLOAT maxLOD = D3D12_FLOAT32_MAX,
+//	D3D12_SHADER_VISIBILITY shaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
+//	UINT registerSpace = 0)
+
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> CrateApp::GetStaticSamplers()
+{
+	// Applications usually only need a handful of samplers.  So just define them all up front
+	// and keep them available as part of the root signature.  
+
+	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
+		0, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+	 const CD3DX12_STATIC_SAMPLER_DESC border(
+		1, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER, // addressW
+		0,								   // mipLODBias
+		16,								// maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK //There are some limitations on what the border color can be.
+	);
+
+
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+		2, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,   // addressW
+		 0,								   // mipLODBias
+		 16,								// maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+        D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE //There are some limitations on what the border color can be.
+		);
+
+	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+		3, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
+		4, // shaderRegister
+		D3D12_FILTER_ANISOTROPIC, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
+		0.0f,                             // mipLODBias
+		8);                               // maxAnisotropy
+
+	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
+		5, // shaderRegister
+		D3D12_FILTER_ANISOTROPIC, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressW
+		0.0f,                              // mipLODBias
+		8);                                // maxAnisotropy
+
+	//step5
+	const CD3DX12_STATIC_SAMPLER_DESC mirror(
+		6, // shaderRegister
+		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_MIRROR,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_MIRROR,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_MIRROR); // addressW
+
+	return { 
+		pointWrap, border,
+		linearWrap, linearClamp, 
+		anisotropicWrap, anisotropicClamp, mirror };
+}
+
+
+
+
+
+
+
+
+

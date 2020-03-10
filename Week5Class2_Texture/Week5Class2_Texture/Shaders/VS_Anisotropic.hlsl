@@ -6,7 +6,7 @@
 
 // Defaults for number of lights.
 #ifndef NUM_DIR_LIGHTS
-    #define NUM_DIR_LIGHTS 2
+    #define NUM_DIR_LIGHTS 3
 #endif
 
 #ifndef NUM_POINT_LIGHTS
@@ -20,23 +20,29 @@
 // Include structures and functions for lighting.
 #include "LightingUtil.hlsl"
 
-// Constant data that varies per frame.
+//step1
+Texture2D    gDiffuseMap : register(t0);
 
+SamplerState gsamPointWrap : register(s0);
+SamplerState gsamPointClamp : register(s1);
+SamplerState gsamLinearWrap : register(s2);
+SamplerState gsamLinearClamp : register(s3);
+SamplerState gsamAnisotropicWrap : register(s4);
+SamplerState gsamAnisotropicClamp : register(s5);
+SamplerState gsamMirror : register(s6);
+
+
+
+
+// Constant data that varies per object.
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
+    float4x4 gTexTransform;
 };
 
-cbuffer cbMaterial : register(b1)
-{
-	float4 gDiffuseAlbedo;
-    float3 gFresnelR0;
-    float  gRoughness;
-	float4x4 gMatTransform;
-};
-
-// Constant data that varies per material.
-cbuffer cbPass : register(b2)
+// Constant data that varies per frame.
+cbuffer cbPass : register(b1)
 {
     float4x4 gView;
     float4x4 gInvView;
@@ -60,11 +66,22 @@ cbuffer cbPass : register(b2)
     // are spot lights for a maximum of MaxLights per object.
     Light gLights[MaxLights];
 };
- 
+
+// Constant data that varies per material.
+cbuffer cbMaterial : register(b2)
+{
+	float4 gDiffuseAlbedo;
+    float3 gFresnelR0;
+    float  gRoughness;
+    float4x4 gMatTransform;
+};
+
 struct VertexIn
 {
 	float3 PosL    : POSITION;
     float3 NormalL : NORMAL;
+    //step2
+	float2 TexC    : TEXCOORD;
 };
 
 struct VertexOut
@@ -72,6 +89,8 @@ struct VertexOut
 	float4 PosH    : SV_POSITION;
     float3 PosW    : POSITION;
     float3 NormalW : NORMAL;
+    //step15
+	float2 TexC    : TEXCOORD;
 };
 
 VertexOut VS(VertexIn vin)
@@ -87,9 +106,12 @@ VertexOut VS(VertexIn vin)
 
     // Transform to homogeneous clip space.
     vout.PosH = mul(posW, gViewProj);
+	
+	// Output vertex attributes for interpolation across triangle.
+    //step16
+    float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
+    vout.TexC = mul(texC, gMatTransform).xy;
 
     return vout;
 }
-
-
 
