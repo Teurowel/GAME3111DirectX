@@ -113,8 +113,9 @@ private:
 	void BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
-
-
+	void Tower(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void Park(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void Barrigates(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
@@ -1322,6 +1323,9 @@ void TreeBillboardsApp::BuildRenderItems()
 	BuildTwoBuildings(XMVectorSet(5.f, 5.f, 12.f, 0.f));
 	BuildStrangeBuildings(XMVectorSet(12.f, 2.f, 2.f, 0.f));
 	BuildSquareBuilding(XMVectorSet(12.f, 2.f, -11.f, 0.f));
+	Tower(XMVectorSet(0.f, 0.f, -4.f, 0.f));
+	Park(XMVectorSet(0.f, 0.f, -4.f, 0.f));
+	Barrigates(XMVectorSet(0.f, 0.f, 0.f, 0.f));
 
   /*  auto gridRitem = std::make_unique<RenderItem>();
     gridRitem->World = MathHelper::Identity4x4();
@@ -2367,6 +2371,466 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	mRitemLayer[(int)RenderLayer::Opaque].push_back(deco6.get());
 	mAllRitems.push_back(std::move(deco6));
 
+}
+
+void TreeBillboardsApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//1st Building
+	auto firstBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(2.0f, 8.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 12.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&firstBuilding->World,
+		XMLoadFloat4x4(&firstBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	firstBuilding->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	firstBuilding->ObjCBIndex = mObjCBIndex++;
+	firstBuilding->Geo = mGeometries["shapeGeo"].get();
+	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(firstBuilding.get());
+	mAllRitems.push_back(std::move(firstBuilding));
+
+	//2ND
+	auto SecondBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&SecondBuilding->World, XMMatrixScaling(9.0f, 1.0f, 9.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 18.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&SecondBuilding->World,
+		XMLoadFloat4x4(&SecondBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	SecondBuilding->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&SecondBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	SecondBuilding->ObjCBIndex = mObjCBIndex++;
+	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
+	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(SecondBuilding.get());
+	mAllRitems.push_back(std::move(SecondBuilding));
+}
+
+void TreeBillboardsApp::Park(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//1st Building
+	auto firstBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(8.0f, 0.1f, 8.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(3.0f, 0.f, -5.0f));
+
+	//World
+	XMStoreFloat4x4(&firstBuilding->World,
+		XMLoadFloat4x4(&firstBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	firstBuilding->Mat = mMaterials["grass"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	firstBuilding->ObjCBIndex = mObjCBIndex++;
+	firstBuilding->Geo = mGeometries["shapeGeo"].get();
+	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(firstBuilding.get());
+	mAllRitems.push_back(std::move(firstBuilding));
+
+	//2nd
+	auto SecondBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&SecondBuilding->World, XMMatrixScaling(8.0f, 0.1f, 8.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-3.0f, 0.f, 7.0f));
+
+	//World
+	XMStoreFloat4x4(&SecondBuilding->World,
+		XMLoadFloat4x4(&SecondBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	SecondBuilding->Mat = mMaterials["grass"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&SecondBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	SecondBuilding->ObjCBIndex = mObjCBIndex++;
+	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
+	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(SecondBuilding.get());
+	mAllRitems.push_back(std::move(SecondBuilding));
+
+
+
+}
+
+void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//1st Building
+	auto firstBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(3.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&firstBuilding->World,
+		XMLoadFloat4x4(&firstBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	firstBuilding->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	firstBuilding->ObjCBIndex = mObjCBIndex++;
+	firstBuilding->Geo = mGeometries["shapeGeo"].get();
+	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(firstBuilding.get());
+	mAllRitems.push_back(std::move(firstBuilding));
+
+	//2nd
+	auto SecondBuilding = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&SecondBuilding->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(1.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&SecondBuilding->World,
+		XMLoadFloat4x4(&SecondBuilding->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	SecondBuilding->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&SecondBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	SecondBuilding->ObjCBIndex = mObjCBIndex++;
+	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
+	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
+	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(SecondBuilding.get());
+	mAllRitems.push_back(std::move(SecondBuilding));
+
+	//3rd
+	auto Third = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Third->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-1.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Third->World,
+		XMLoadFloat4x4(&Third->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Third->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Third->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Third->ObjCBIndex = mObjCBIndex++;
+	Third->Geo = mGeometries["shapeGeo"].get();
+	Third->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Third->IndexCount = Third->Geo->DrawArgs["cylinder"].IndexCount;
+	Third->StartIndexLocation = Third->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Third->BaseVertexLocation = Third->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Third.get());
+	mAllRitems.push_back(std::move(Third));
+
+	//4th
+	auto Fourth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Fourth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-3.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Fourth->World,
+		XMLoadFloat4x4(&Fourth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Fourth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Fourth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Fourth->ObjCBIndex = mObjCBIndex++;
+	Fourth->Geo = mGeometries["shapeGeo"].get();
+	Fourth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Fourth->IndexCount = Fourth->Geo->DrawArgs["cylinder"].IndexCount;
+	Fourth->StartIndexLocation = Fourth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Fourth->BaseVertexLocation = Fourth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Fourth.get());
+	mAllRitems.push_back(std::move(Fourth));
+
+	//5th
+	auto Fifth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Fifth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-5.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Fifth->World,
+		XMLoadFloat4x4(&Fifth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Fifth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Fifth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Fifth->ObjCBIndex = mObjCBIndex++;
+	Fifth->Geo = mGeometries["shapeGeo"].get();
+	Fifth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Fifth->IndexCount = Fifth->Geo->DrawArgs["cylinder"].IndexCount;
+	Fifth->StartIndexLocation = Fifth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Fifth->BaseVertexLocation = Fifth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Fifth.get());
+	mAllRitems.push_back(std::move(Fifth));
+
+	//6th
+	auto Sisth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Sisth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-7.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Sisth->World,
+		XMLoadFloat4x4(&Sisth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Sisth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Sisth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Sisth->ObjCBIndex = mObjCBIndex++;
+	Sisth->Geo = mGeometries["shapeGeo"].get();
+	Sisth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Sisth->IndexCount = Sisth->Geo->DrawArgs["cylinder"].IndexCount;
+	Sisth->StartIndexLocation = Sisth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Sisth->BaseVertexLocation = Sisth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Sisth.get());
+	mAllRitems.push_back(std::move(Sisth));
+
+	//7th
+	auto Seventh = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Seventh->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(5.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Seventh->World,
+		XMLoadFloat4x4(&Seventh->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Seventh->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Seventh->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Seventh->ObjCBIndex = mObjCBIndex++;
+	Seventh->Geo = mGeometries["shapeGeo"].get();
+	Seventh->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Seventh->IndexCount = Seventh->Geo->DrawArgs["cylinder"].IndexCount;
+	Seventh->StartIndexLocation = Seventh->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Seventh->BaseVertexLocation = Seventh->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Seventh.get());
+	mAllRitems.push_back(std::move(Seventh));
+
+	//8th
+	auto Eighth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Eighth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(7.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Eighth->World,
+		XMLoadFloat4x4(&Eighth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Eighth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Eighth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Eighth->ObjCBIndex = mObjCBIndex++;
+	Eighth->Geo = mGeometries["shapeGeo"].get();
+	Eighth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Eighth->IndexCount = Eighth->Geo->DrawArgs["cylinder"].IndexCount;
+	Eighth->StartIndexLocation = Eighth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Eighth->BaseVertexLocation = Eighth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Eighth.get());
+	mAllRitems.push_back(std::move(Eighth));
+
+	//9th
+	auto Nineth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Nineth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(9.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Nineth->World,
+		XMLoadFloat4x4(&Nineth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Nineth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Nineth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Nineth->ObjCBIndex = mObjCBIndex++;
+	Nineth->Geo = mGeometries["shapeGeo"].get();
+	Nineth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Nineth->IndexCount = Nineth->Geo->DrawArgs["cylinder"].IndexCount;
+	Nineth->StartIndexLocation = Nineth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Nineth->BaseVertexLocation = Nineth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Nineth.get());
+	mAllRitems.push_back(std::move(Nineth));
+
+	//10th
+	auto Tenth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Tenth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(11.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Tenth->World,
+		XMLoadFloat4x4(&Tenth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Tenth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Tenth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Tenth->ObjCBIndex = mObjCBIndex++;
+	Tenth->Geo = mGeometries["shapeGeo"].get();
+	Tenth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Tenth->IndexCount = Tenth->Geo->DrawArgs["cylinder"].IndexCount;
+	Tenth->StartIndexLocation = Tenth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Tenth->BaseVertexLocation = Tenth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Tenth.get());
+	mAllRitems.push_back(std::move(Tenth));
+
+	//11th
+	auto Eleventh = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Eleventh->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(13.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Eleventh->World,
+		XMLoadFloat4x4(&Eleventh->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Eleventh->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Eleventh->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Eleventh->ObjCBIndex = mObjCBIndex++;
+	Eleventh->Geo = mGeometries["shapeGeo"].get();
+	Eleventh->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Eleventh->IndexCount = Eleventh->Geo->DrawArgs["cylinder"].IndexCount;
+	Eleventh->StartIndexLocation = Eleventh->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Eleventh->BaseVertexLocation = Eleventh->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Eleventh.get());
+	mAllRitems.push_back(std::move(Eleventh));
+
+	//12th
+	auto Twelveth = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&Twelveth->World, XMMatrixScaling(0.3f, 0.5f, 0.3f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-13.0f, 0.f, -14.5f));
+
+	//World
+	XMStoreFloat4x4(&Twelveth->World,
+		XMLoadFloat4x4(&Twelveth->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	Twelveth->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&Twelveth->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	Twelveth->ObjCBIndex = mObjCBIndex++;
+	Twelveth->Geo = mGeometries["shapeGeo"].get();
+	Twelveth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Twelveth->IndexCount = Twelveth->Geo->DrawArgs["cylinder"].IndexCount;
+	Twelveth->StartIndexLocation = Twelveth->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	Twelveth->BaseVertexLocation = Twelveth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(Twelveth.get());
+	mAllRitems.push_back(std::move(Twelveth));
 }
 
 void TreeBillboardsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
