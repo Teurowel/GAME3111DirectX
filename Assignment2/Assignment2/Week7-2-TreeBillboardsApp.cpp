@@ -89,6 +89,7 @@ private:
 	void UpdateWaves(const GameTimer& gt); 
 
 	void LoadTextures();
+	void CreateTexture(std::string name, std::wstring path, bool bTextureArray = false);
     void BuildRootSignature();
 	void BuildDescriptorHeaps();
     void BuildShadersAndInputLayouts();
@@ -100,8 +101,9 @@ private:
     void BuildPSOs();
     void BuildFrameResources();
     void BuildMaterials();
+	void CreateMaterials(std::string name, XMFLOAT4 diffuseAlbedo, XMFLOAT3 fresnelR0, float roughness);
     void BuildRenderItems();
-	void BuildPrimitives();
+	void BuildGround(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
@@ -160,6 +162,12 @@ private:
     POINT mLastMousePos;
 
 	UINT mObjCBIndex = 0;
+	UINT mNumOfTex = 0;
+	int mMatCBIdx = 0;
+	int mDiffuseSrvHeapIdx = 0;
+
+	std::vector<std::string> mTextuersName;
+	std::vector<std::string> mTextuerArraysName;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -602,42 +610,6 @@ void TreeBillboardsApp::UpdateWaves(const GameTimer& gt)
 	mWavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
 }
 
-void TreeBillboardsApp::LoadTextures()
-{
-	auto grassTex = std::make_unique<Texture>();
-	grassTex->Name = "grassTex";
-	grassTex->Filename = L"../../Textures/grass.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), grassTex->Filename.c_str(),
-		grassTex->Resource, grassTex->UploadHeap));
-
-	auto waterTex = std::make_unique<Texture>();
-	waterTex->Name = "waterTex";
-	waterTex->Filename = L"../../Textures/water1.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), waterTex->Filename.c_str(),
-		waterTex->Resource, waterTex->UploadHeap));
-
-	auto fenceTex = std::make_unique<Texture>();
-	fenceTex->Name = "fenceTex";
-	fenceTex->Filename = L"../../Textures/WireFence.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), fenceTex->Filename.c_str(),
-		fenceTex->Resource, fenceTex->UploadHeap));
-
-	auto treeArrayTex = std::make_unique<Texture>();
-	treeArrayTex->Name = "treeArrayTex";
-	treeArrayTex->Filename = L"../../Textures/treeArray.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), treeArrayTex->Filename.c_str(),
-		treeArrayTex->Resource, treeArrayTex->UploadHeap));
-
-	mTextures[grassTex->Name] = std::move(grassTex);
-	mTextures[waterTex->Name] = std::move(waterTex);
-	mTextures[fenceTex->Name] = std::move(fenceTex);
-	mTextures[treeArrayTex->Name] = std::move(treeArrayTex);
-}
-
 void TreeBillboardsApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE texTable;
@@ -678,13 +650,51 @@ void TreeBillboardsApp::BuildRootSignature()
         IID_PPV_ARGS(mRootSignature.GetAddressOf())));
 }
 
+void TreeBillboardsApp::LoadTextures()
+{
+	/////////////////////////////////////////////////////////////////////////////
+	/* Order matters when Adding to mSrvDescriptorHeap
+		When we build materials, DiffuseSrvHeapIndex should match the order of adding descriptor to mSrvDescriptorHeap
+	*/
+	/////////////////////////////////////////////////////////////////////////////
+	//Texture
+	CreateTexture("grassTex", L"../../Textures/grass.dds");				
+	CreateTexture("waterTex", L"../../Textures/water1.dds");			
+	CreateTexture("fenceTex", L"../../Textures/WireFence.dds");
+	CreateTexture("brickTex", L"../../Textures/bricks.dds");
+	CreateTexture("stoneTex", L"../../Textures/stone.dds");
+
+
+	//Texture Array
+	CreateTexture("treeArrayTex", L"../../Textures/treeArray.dds", true);
+}
+
+void TreeBillboardsApp::CreateTexture(std::string name, std::wstring path, bool bTextureArray)
+{
+	auto texture = std::make_unique<Texture>();
+	texture->Name = name;
+	texture->Filename = path;
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), texture->Filename.c_str(),
+		texture->Resource, texture->UploadHeap));
+
+	mNumOfTex++;
+
+	if (bTextureArray == false)
+		mTextuersName.push_back(name);
+	else
+		mTextuerArraysName.push_back(name);
+
+	mTextures[texture->Name] = std::move(texture);
+}
+
 void TreeBillboardsApp::BuildDescriptorHeaps()
 {
 	//
 	// Create the SRV heap.
 	//
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 4;
+	srvHeapDesc.NumDescriptors = mNumOfTex;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -694,42 +704,79 @@ void TreeBillboardsApp::BuildDescriptorHeaps()
 	//
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	auto grassTex = mTextures["grassTex"]->Resource;
-	auto waterTex = mTextures["waterTex"]->Resource;
-	auto fenceTex = mTextures["fenceTex"]->Resource;
-	auto treeArrayTex = mTextures["treeArrayTex"]->Resource;
+	/////////////////////////////////////////////////////////////////////////////
+	/* Order matters when Adding to mSrvDescriptorHeap
+		When we build materials, DiffuseSrvHeapIndex should match the order of adding descriptor to mSrvDescriptorHeap
+	*/
+	/////////////////////////////////////////////////////////////////////////////
 
+	//Texture
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = grassTex->GetDesc().Format;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.MipLevels = -1;
-	md3dDevice->CreateShaderResourceView(grassTex.Get(), &srvDesc, hDescriptor);
 
-	// next descriptor
-	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
+	for (int i = 0; i < mTextuersName.size(); ++i)
+	{
+		auto texture = mTextures[mTextuersName[i]]->Resource;
 
-	srvDesc.Format = waterTex->GetDesc().Format;
-	md3dDevice->CreateShaderResourceView(waterTex.Get(), &srvDesc, hDescriptor);
+		srvDesc.Format = texture->GetDesc().Format;
+		md3dDevice->CreateShaderResourceView(texture.Get(), &srvDesc, hDescriptor);
+		hDescriptor.Offset(1, mCbvSrvDescriptorSize);
+	}
 
-	// next descriptor
-	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
 
-	srvDesc.Format = fenceTex->GetDesc().Format;
-	md3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
 
-	// next descriptor
-	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
-
-	auto desc = treeArrayTex->GetDesc();
+	//Texture Array
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-	srvDesc.Format = treeArrayTex->GetDesc().Format;
 	srvDesc.Texture2DArray.MostDetailedMip = 0;
 	srvDesc.Texture2DArray.MipLevels = -1;
 	srvDesc.Texture2DArray.FirstArraySlice = 0;
-	srvDesc.Texture2DArray.ArraySize = treeArrayTex->GetDesc().DepthOrArraySize;
-	md3dDevice->CreateShaderResourceView(treeArrayTex.Get(), &srvDesc, hDescriptor);
+
+	for (int i = 0; i < mTextuerArraysName.size(); ++i)
+	{
+		auto texture = mTextures[mTextuerArraysName[i]]->Resource;
+
+		srvDesc.Format = texture->GetDesc().Format;
+		srvDesc.Texture2DArray.ArraySize = texture->GetDesc().DepthOrArraySize;
+		md3dDevice->CreateShaderResourceView(texture.Get(), &srvDesc, hDescriptor);
+	}
+}
+
+void TreeBillboardsApp::BuildMaterials()
+{
+	/////////////////////////////////////////////////////////////////////////////
+/* Order matters when Adding to mSrvDescriptorHeap
+	When we build materials, DiffuseSrvHeapIndex should match the order of adding descriptor to mSrvDescriptorHeap
+*/
+/////////////////////////////////////////////////////////////////////////////
+
+	//Texture
+	CreateMaterials("grass", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	// This is not a good water material definition, but we do not have all the rendering
+	// tools we need (transparency, environment reflection), so we fake it for now.
+	CreateMaterials("water", XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f), XMFLOAT3(0.1f, 0.1f, 0.1f), 0.0f);
+	CreateMaterials("wirefence", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.02f, 0.02f, 0.02f), 0.25f);
+	CreateMaterials("brick", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("stone", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+
+
+
+	//Textuer Array
+	CreateMaterials("treeSprites", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+}
+
+void TreeBillboardsApp::CreateMaterials(std::string name, XMFLOAT4 diffuseAlbedo, XMFLOAT3 fresnelR0, float roughness)
+{
+	auto material = std::make_unique<Material>();
+	material->Name = name;
+	material->MatCBIndex = mMatCBIdx++;
+	material->DiffuseSrvHeapIndex = mDiffuseSrvHeapIdx++;
+	material->DiffuseAlbedo = diffuseAlbedo;
+	material->FresnelR0 = fresnelR0;
+	material->Roughness = roughness;
+	mMaterials[name] = std::move(material);
 }
 
 void TreeBillboardsApp::BuildShadersAndInputLayouts()
@@ -1344,51 +1391,10 @@ void TreeBillboardsApp::BuildFrameResources()
     }
 }
 
-void TreeBillboardsApp::BuildMaterials()
-{
-	auto grass = std::make_unique<Material>();
-	grass->Name = "grass";
-	grass->MatCBIndex = 0;
-	grass->DiffuseSrvHeapIndex = 0;
-	grass->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass->Roughness = 0.125f;
-
-	// This is not a good water material definition, but we do not have all the rendering
-	// tools we need (transparency, environment reflection), so we fake it for now.
-	auto water = std::make_unique<Material>();
-	water->Name = "water";
-	water->MatCBIndex = 1;
-	water->DiffuseSrvHeapIndex = 1;
-	water->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
-	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->Roughness = 0.0f;
-
-	auto wirefence = std::make_unique<Material>();
-	wirefence->Name = "wirefence";
-	wirefence->MatCBIndex = 2;
-	wirefence->DiffuseSrvHeapIndex = 2;
-	wirefence->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	wirefence->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	wirefence->Roughness = 0.25f;
-
-	auto treeSprites = std::make_unique<Material>();
-	treeSprites->Name = "treeSprites";
-	treeSprites->MatCBIndex = 3;
-	treeSprites->DiffuseSrvHeapIndex = 3;
-	treeSprites->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	treeSprites->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	treeSprites->Roughness = 0.125f;
-
-	mMaterials["grass"] = std::move(grass);
-	mMaterials["water"] = std::move(water);
-	mMaterials["wirefence"] = std::move(wirefence);
-	mMaterials["treeSprites"] = std::move(treeSprites);
-}
-
 void TreeBillboardsApp::BuildRenderItems()
 {
-	BuildPrimitives();
+	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3, 1.f, 3.f, 0.f));
+
  //   auto wavesRitem = std::make_unique<RenderItem>();
  //   wavesRitem->World = MathHelper::Identity4x4();
 	//XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
@@ -1448,33 +1454,65 @@ void TreeBillboardsApp::BuildRenderItems()
 	//mAllRitems.push_back(std::move(treeSpritesRitem));
 }
 
-void TreeBillboardsApp::BuildPrimitives()
+void TreeBillboardsApp::BuildGround(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
 {
-	//Build Box
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(-15.0f, 5.f, 0.0f));
-	boxRitem->ObjCBIndex = mObjCBIndex++;
-	boxRitem->Mat = mMaterials["grass"].get();
-	boxRitem->Geo = mGeometries["shapeGeo"].get();
-	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-	mRitemLayer[(int)RenderLayer::Opaque].push_back(boxRitem.get());
-	mAllRitems.push_back(std::move(boxRitem));
+	//Ground
+	auto ground = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&ground->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&ground->World,
+		XMLoadFloat4x4(&ground->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	ground->Mat = mMaterials["stone"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&ground->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+
+	ground->ObjCBIndex = mObjCBIndex++;
+	ground->Geo = mGeometries["shapeGeo"].get();
+	ground->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	ground->IndexCount = ground->Geo->DrawArgs["grid"].IndexCount;
+	ground->StartIndexLocation = ground->Geo->DrawArgs["grid"].StartIndexLocation;
+	ground->BaseVertexLocation = ground->Geo->DrawArgs["grid"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(ground.get());
+	mAllRitems.push_back(std::move(ground));
+}
+
+//void TreeBillboardsApp::BuildPrimitives()
+//{
+	////Build Box
+	//auto boxRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(-15.0f, 5.f, 0.0f));
+	//boxRitem->ObjCBIndex = mObjCBIndex++;
+	//boxRitem->Mat = mMaterials["grass"].get();
+	//boxRitem->Geo = mGeometries["shapeGeo"].get();
+	//boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+	//boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+	//boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+	//mRitemLayer[(int)RenderLayer::Opaque].push_back(boxRitem.get());
+	//mAllRitems.push_back(std::move(boxRitem));
 
 
-	//Build Cylinder
-	auto cylRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&cylRitem->World, XMMatrixTranslation(-20.0f, 5.f, 0.f));
-	cylRitem->ObjCBIndex = mObjCBIndex++;
-	cylRitem->Mat = mMaterials["grass"].get();
-	cylRitem->Geo = mGeometries["shapeGeo"].get();
-	cylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	cylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-	cylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-	cylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(leftCylRitem));
+	////Build Cylinder
+	//auto cylRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&cylRitem->World, XMMatrixTranslation(-20.0f, 5.f, 0.f));
+	//cylRitem->ObjCBIndex = mObjCBIndex++;
+	//cylRitem->Mat = mMaterials["brick"].get();
+	//cylRitem->Geo = mGeometries["shapeGeo"].get();
+	//cylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//cylRitem->IndexCount = cylRitem->Geo->DrawArgs["cylinder"].IndexCount;
+	//cylRitem->StartIndexLocation = cylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	//cylRitem->BaseVertexLocation = cylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	//mRitemLayer[(int)RenderLayer::Opaque].push_back(cylRitem.get());
+	//mAllRitems.push_back(std::move(cylRitem));
 
 
 	////Build SPhere
@@ -1567,7 +1605,7 @@ void TreeBillboardsApp::BuildPrimitives()
 	//triSquareRitem->StartIndexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].StartIndexLocation;
 	//triSquareRitem->BaseVertexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].BaseVertexLocation;
 	//mAllRitems.push_back(std::move(triSquareRitem));
-}
+//}
 
 void TreeBillboardsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
