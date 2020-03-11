@@ -92,6 +92,7 @@ private:
     void BuildRootSignature();
 	void BuildDescriptorHeaps();
     void BuildShadersAndInputLayouts();
+	void BuildShapeGeometry();
     void BuildLandGeometry();
     void BuildWavesGeometry();
 	void BuildBoxGeometry();
@@ -100,6 +101,8 @@ private:
     void BuildFrameResources();
     void BuildMaterials();
     void BuildRenderItems();
+	void BuildPrimitives();
+
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
@@ -140,15 +143,23 @@ private:
 
     PassConstants mMainPassCB;
 
-	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
+	bool mIsWireframe = false;
+
+	XMFLOAT3 mEyePos = { 0.0f, 5.0f, -40.0f };
+	XMFLOAT3 mFront = { 0.f, 0.f, 1.f };
+	XMFLOAT3 mRight = { 1.f, 0.f, 0.f };
+	XMFLOAT3 mUp = { 0.f ,1.f, 0.f };
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-    float mTheta = 1.5f*XM_PI;
-    float mPhi = XM_PIDIV2 - 0.1f;
-    float mRadius = 50.0f;
+	float mTheta = 0.f;// 1.5f * XM_PI;
+	float mPhi = 0.f;// 0.2f * XM_PI;
+	float mRadius = 15.0f;
+	float mCameraSpeed = 10.f;
 
     POINT mLastMousePos;
+
+	UINT mObjCBIndex = 0;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -197,16 +208,17 @@ bool TreeBillboardsApp::Initialize()
 	// so we have to query this information.
     mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    mWaves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+    //mWaves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
  
 	LoadTextures();
     BuildRootSignature();
 	BuildDescriptorHeaps();
     BuildShadersAndInputLayouts();
-    BuildLandGeometry();
-    BuildWavesGeometry();
-	BuildBoxGeometry();
-	BuildTreeSpritesGeometry();
+	BuildShapeGeometry();
+    //BuildLandGeometry();
+    //BuildWavesGeometry();
+	//BuildBoxGeometry();
+	//BuildTreeSpritesGeometry();
 	BuildMaterials();
     BuildRenderItems();
     BuildFrameResources();
@@ -251,11 +263,11 @@ void TreeBillboardsApp::Update(const GameTimer& gt)
         CloseHandle(eventHandle);
     }
 
-	AnimateMaterials(gt);
+	//AnimateMaterials(gt);
 	UpdateObjectCBs(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
-    UpdateWaves(gt);
+   //UpdateWaves(gt);
 }
 
 void TreeBillboardsApp::Draw(const GameTimer& gt)
@@ -342,51 +354,104 @@ void TreeBillboardsApp::OnMouseUp(WPARAM btnState, int x, int y)
 
 void TreeBillboardsApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
-    if((btnState & MK_LBUTTON) != 0)
-    {
-        // Make each pixel correspond to a quarter of a degree.
-        float dx = XMConvertToRadians(0.25f*static_cast<float>(x - mLastMousePos.x));
-        float dy = XMConvertToRadians(0.25f*static_cast<float>(y - mLastMousePos.y));
+	if ((btnState & MK_LBUTTON) != 0)
+	{
+		// Make each pixel correspond to a quarter of a degree.
+		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
+		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
-        // Update angles based on input to orbit camera around box.
-        mTheta += dx;
-        mPhi += dy;
+		// Update angles based on input to orbit camera around box.
+		mTheta += dx;
+		mPhi -= dy;
 
-        // Restrict the angle mPhi.
-        mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
-    }
-    else if((btnState & MK_RBUTTON) != 0)
-    {
-        // Make each pixel correspond to 0.2 unit in the scene.
-        float dx = 0.2f*static_cast<float>(x - mLastMousePos.x);
-        float dy = 0.2f*static_cast<float>(y - mLastMousePos.y);
+		// Restrict the angle mPhi.
+		//mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
+		mPhi = MathHelper::Clamp(mPhi, -MathHelper::Pi * 0.5f + 0.1f, MathHelper::Pi * 0.5f - 0.1f);
+	}
+	//else if ((btnState & MK_RBUTTON) != 0)
+	//{
+	//	// Make each pixel correspond to 0.2 unit in the scene.
+	//	float dx = 0.05f * static_cast<float>(x - mLastMousePos.x);
+	//	float dy = 0.05f * static_cast<float>(y - mLastMousePos.y);
 
-        // Update the camera radius based on input.
-        mRadius += dx - dy;
+	//	// Update the camera radius based on input.
+	//	mRadius += dx - dy;
 
-        // Restrict the radius.
-        mRadius = MathHelper::Clamp(mRadius, 5.0f, 150.0f);
-    }
+	//	// Restrict the radius.
+	//	mRadius = MathHelper::Clamp(mRadius, 5.0f, 150.0f);
+	//}
 
-    mLastMousePos.x = x;
-    mLastMousePos.y = y;
+	mLastMousePos.x = x;
+	mLastMousePos.y = y;
 }
  
 void TreeBillboardsApp::OnKeyboardInput(const GameTimer& gt)
 {
+	if (GetAsyncKeyState('1') & 0x8000)
+		mIsWireframe = true;
+	else
+		mIsWireframe = false;
+
+	//w
+	if (GetAsyncKeyState(0x57) & 0x8000)
+	{
+		mEyePos.x += mFront.x * mCameraSpeed * gt.DeltaTime();
+		mEyePos.y += mFront.y * mCameraSpeed * gt.DeltaTime();
+		mEyePos.z += mFront.z * mCameraSpeed * gt.DeltaTime();
+	}
+	//s
+	if (GetAsyncKeyState(0x53) & 0x8000)
+	{
+		mEyePos.x -= mFront.x * mCameraSpeed * gt.DeltaTime();
+		mEyePos.y -= mFront.y * mCameraSpeed * gt.DeltaTime();
+		mEyePos.z -= mFront.z * mCameraSpeed * gt.DeltaTime();
+	}
+	//a
+	if (GetAsyncKeyState(0x41) & 0x8000)
+	{
+		mEyePos.x -= mRight.x * mCameraSpeed * gt.DeltaTime();
+		mEyePos.y -= mRight.y * mCameraSpeed * gt.DeltaTime();
+		mEyePos.z -= mRight.z * mCameraSpeed * gt.DeltaTime();
+	}
+	//d
+	if (GetAsyncKeyState(0x44) & 0x8000)
+	{
+		mEyePos.x += mRight.x * mCameraSpeed * gt.DeltaTime();
+		mEyePos.y += mRight.y * mCameraSpeed * gt.DeltaTime();
+		mEyePos.z += mRight.z * mCameraSpeed * gt.DeltaTime();
+	}
 }
  
 void TreeBillboardsApp::UpdateCamera(const GameTimer& gt)
 {
 	// Convert Spherical to Cartesian coordinates.
-	mEyePos.x = mRadius*sinf(mPhi)*cosf(mTheta);
-	mEyePos.z = mRadius*sinf(mPhi)*sinf(mTheta);
-	mEyePos.y = mRadius*cosf(mPhi);
+//mEyePos.x = mRadius * sinf(mPhi) * cosf(mTheta);
+//mEyePos.z = mRadius * sinf(mPhi) * sinf(mTheta);
+//mEyePos.y = mRadius * cosf(mPhi);
+
+//mTheta == Yaw, mPhi == Pitch
+
+	mFront.x = sin(mTheta) * cos(mPhi);
+	mFront.y = sin(mPhi);
+	mFront.z = cos(mTheta) * cos(mPhi);
+
+	//calculate front vector
+	XMVECTOR front = XMVector3Normalize(XMLoadFloat3(&mFront));
+	XMStoreFloat3(&mFront, front);
+
+	//calculate right vector
+	XMVECTOR right = XMVector3Normalize(XMVector3Cross(XMVectorSet(0.f, 1.f, 0.f, 0.f), front));
+	XMStoreFloat3(&mRight, right);
+
+	//calculate up vector
+	XMVECTOR up = XMVector3Normalize(XMVector3Cross(front, right));
+	XMStoreFloat3(&mUp, up);
 
 	// Build the view matrix.
 	XMVECTOR pos = XMVectorSet(mEyePos.x, mEyePos.y, mEyePos.z, 1.0f);
-	XMVECTOR target = XMVectorZero();
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	//XMVECTOR target = XMVectorZero();
+	XMVECTOR target = pos + front;
+	//XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
 	XMStoreFloat4x4(&mView, view);
@@ -490,12 +555,8 @@ void TreeBillboardsApp::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.TotalTime = gt.TotalTime();
 	mMainPassCB.DeltaTime = gt.DeltaTime();
 	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
-	mMainPassCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
+	mMainPassCB.Lights[0].Direction = { 1.f, -1.f, 1.f };
 	mMainPassCB.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
-	mMainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
-	mMainPassCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
-	mMainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
-	mMainPassCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
@@ -706,6 +767,245 @@ void TreeBillboardsApp::BuildShadersAndInputLayouts()
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
+}
+
+void TreeBillboardsApp::BuildShapeGeometry()
+{
+	GeometryGenerator geoGen;
+
+	GeometryGenerator::MeshData box = geoGen.CreateBox(1.f, 1.0f, 1.0f, 0);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(10.0f, 10.0f, 10, 10);
+	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
+	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.5f, 3.0f, 20, 20);
+	GeometryGenerator::MeshData pyramid = geoGen.CreatePyramid(1, 1, 1, 0);
+	GeometryGenerator::MeshData cone = geoGen.CreateCone(1.f, 1.f, 40, 6);
+	GeometryGenerator::MeshData diamond = geoGen.CreateDiamond(1, 2, 1, 0);
+	GeometryGenerator::MeshData wedge = geoGen.CreateWedge(1, 1, 1, 0);
+	GeometryGenerator::MeshData halfPyramid = geoGen.CreateHalfPyramid(1, 1, 0.5, 0.5, 1, 0);
+	GeometryGenerator::MeshData triSquare = geoGen.CreateTriSquare(1, 2, 0);
+
+	// We are concatenating all the geometry into one big vertex/index buffer.  So
+	// define the regions in the buffer each submesh covers.
+
+	// Cache the vertex offsets to each object in the concatenated vertex buffer.
+	UINT boxVertexOffset = 0;
+	UINT gridVertexOffset = (UINT)box.Vertices.size();
+	UINT sphereVertexOffset = gridVertexOffset + (UINT)grid.Vertices.size();
+	UINT cylinderVertexOffset = sphereVertexOffset + (UINT)sphere.Vertices.size();
+	UINT pyramidVertexOffset = cylinderVertexOffset + (UINT)cylinder.Vertices.size();
+	UINT coneVertexOffset = pyramidVertexOffset + (UINT)pyramid.Vertices.size();
+	UINT diamondVertexOffset = coneVertexOffset + (UINT)cone.Vertices.size();
+	UINT wedgeVertexOffset = diamondVertexOffset + (UINT)diamond.Vertices.size();
+	UINT halfPyramidVertexOffset = wedgeVertexOffset + (UINT)wedge.Vertices.size();
+	UINT triSquareVertexOffset = halfPyramidVertexOffset + (UINT)halfPyramid.Vertices.size();
+
+	// Cache the starting index for each object in the concatenated index buffer.
+	UINT boxIndexOffset = 0;
+	UINT gridIndexOffset = (UINT)box.Indices32.size();
+	UINT sphereIndexOffset = gridIndexOffset + (UINT)grid.Indices32.size();
+	UINT cylinderIndexOffset = sphereIndexOffset + (UINT)sphere.Indices32.size();
+	UINT pyramidIndexOffset = cylinderIndexOffset + (UINT)cylinder.Indices32.size();
+	UINT coneIndexOffset = pyramidIndexOffset + (UINT)pyramid.Indices32.size();
+	UINT diamondIndexOffset = coneIndexOffset + (UINT)cone.Indices32.size();
+	UINT wedgeIndexOffset = diamondIndexOffset + (UINT)diamond.Indices32.size();
+	UINT halfPyramidIndexOffset = wedgeIndexOffset + (UINT)wedge.Indices32.size();
+	UINT triSquareIndexOffset = halfPyramidIndexOffset + (UINT)halfPyramid.Indices32.size();
+
+	// Define the SubmeshGeometry that cover different 
+	// regions of the vertex/index buffers.
+	SubmeshGeometry boxSubmesh;
+	boxSubmesh.IndexCount = (UINT)box.Indices32.size();
+	boxSubmesh.StartIndexLocation = boxIndexOffset;
+	boxSubmesh.BaseVertexLocation = boxVertexOffset;
+
+	SubmeshGeometry gridSubmesh;
+	gridSubmesh.IndexCount = (UINT)grid.Indices32.size();
+	gridSubmesh.StartIndexLocation = gridIndexOffset;
+	gridSubmesh.BaseVertexLocation = gridVertexOffset;
+
+	SubmeshGeometry sphereSubmesh;
+	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
+	sphereSubmesh.StartIndexLocation = sphereIndexOffset;
+	sphereSubmesh.BaseVertexLocation = sphereVertexOffset;
+
+	SubmeshGeometry cylinderSubmesh;
+	cylinderSubmesh.IndexCount = (UINT)cylinder.Indices32.size();
+	cylinderSubmesh.StartIndexLocation = cylinderIndexOffset;
+	cylinderSubmesh.BaseVertexLocation = cylinderVertexOffset;
+
+	SubmeshGeometry pyramidSubmesh;
+	pyramidSubmesh.IndexCount = (UINT)pyramid.Indices32.size();
+	pyramidSubmesh.StartIndexLocation = pyramidIndexOffset;
+	pyramidSubmesh.BaseVertexLocation = pyramidVertexOffset;
+
+	SubmeshGeometry coneSubmesh;
+	coneSubmesh.IndexCount = (UINT)cone.Indices32.size();
+	coneSubmesh.StartIndexLocation = coneIndexOffset;
+	coneSubmesh.BaseVertexLocation = coneVertexOffset;
+
+	SubmeshGeometry diamondSubmesh;
+	diamondSubmesh.IndexCount = (UINT)diamond.Indices32.size();
+	diamondSubmesh.StartIndexLocation = diamondIndexOffset;
+	diamondSubmesh.BaseVertexLocation = diamondVertexOffset;
+
+	SubmeshGeometry wedgeSubmesh;
+	wedgeSubmesh.IndexCount = (UINT)wedge.Indices32.size();
+	wedgeSubmesh.StartIndexLocation = wedgeIndexOffset;
+	wedgeSubmesh.BaseVertexLocation = wedgeVertexOffset;
+
+	SubmeshGeometry halfPyramidSubmesh;
+	halfPyramidSubmesh.IndexCount = (UINT)halfPyramid.Indices32.size();
+	halfPyramidSubmesh.StartIndexLocation = halfPyramidIndexOffset;
+	halfPyramidSubmesh.BaseVertexLocation = halfPyramidVertexOffset;
+
+	SubmeshGeometry triSquareSubmesh;
+	triSquareSubmesh.IndexCount = (UINT)triSquare.Indices32.size();
+	triSquareSubmesh.StartIndexLocation = triSquareIndexOffset;
+	triSquareSubmesh.BaseVertexLocation = triSquareVertexOffset;
+
+
+	// Extract the vertex elements we are interested in and pack the
+	// vertices of all the meshes into one vertex buffer.
+
+	auto totalVertexCount =
+		box.Vertices.size() +
+		grid.Vertices.size() +
+		sphere.Vertices.size() +
+		cylinder.Vertices.size() +
+		pyramid.Vertices.size() +
+		cone.Vertices.size() +
+		diamond.Vertices.size() +
+		wedge.Vertices.size() +
+		halfPyramid.Vertices.size() +
+		triSquare.Vertices.size();
+
+	//step6
+	std::vector<Vertex> vertices(totalVertexCount);
+
+	UINT k = 0;
+	for (size_t i = 0; i < box.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = box.Vertices[i].Position;
+		vertices[k].Normal = box.Vertices[i].Normal;
+		vertices[k].TexC = box.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = grid.Vertices[i].Position;
+		vertices[k].Normal = grid.Vertices[i].Normal;
+		vertices[k].TexC = grid.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = sphere.Vertices[i].Position;
+		vertices[k].Normal = sphere.Vertices[i].Normal;
+		vertices[k].TexC = sphere.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = cylinder.Vertices[i].Position;
+		vertices[k].Normal = cylinder.Vertices[i].Normal;
+		vertices[k].TexC = cylinder.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < pyramid.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = pyramid.Vertices[i].Position;
+		vertices[k].Normal = pyramid.Vertices[i].Normal;
+		vertices[k].TexC = pyramid.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < cone.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = cone.Vertices[i].Position;
+		vertices[k].Normal = cone.Vertices[i].Normal;
+		vertices[k].TexC = cone.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < diamond.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = diamond.Vertices[i].Position;
+		vertices[k].Normal = diamond.Vertices[i].Normal;
+		vertices[k].TexC = diamond.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < wedge.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = wedge.Vertices[i].Position;
+		vertices[k].Normal = wedge.Vertices[i].Normal;
+		vertices[k].TexC = wedge.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < halfPyramid.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = halfPyramid.Vertices[i].Position;
+		vertices[k].Normal = halfPyramid.Vertices[i].Normal;
+		vertices[k].TexC = halfPyramid.Vertices[i].TexC;
+	}
+
+	for (size_t i = 0; i < triSquare.Vertices.size(); ++i, ++k)
+	{
+		vertices[k].Pos = triSquare.Vertices[i].Position;
+		vertices[k].Normal = triSquare.Vertices[i].Normal;
+		vertices[k].TexC = triSquare.Vertices[i].TexC;
+	}
+
+
+
+	std::vector<std::uint16_t> indices;
+	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
+	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
+	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
+	indices.insert(indices.end(), std::begin(pyramid.GetIndices16()), std::end(pyramid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(cone.GetIndices16()), std::end(cone.GetIndices16()));
+	indices.insert(indices.end(), std::begin(diamond.GetIndices16()), std::end(diamond.GetIndices16()));
+	indices.insert(indices.end(), std::begin(wedge.GetIndices16()), std::end(wedge.GetIndices16()));
+	indices.insert(indices.end(), std::begin(halfPyramid.GetIndices16()), std::end(halfPyramid.GetIndices16()));
+	indices.insert(indices.end(), std::begin(triSquare.GetIndices16()), std::end(triSquare.GetIndices16()));
+
+
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+	geo->Name = "shapeGeo";
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+
+	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+
+	geo->DrawArgs["box"] = boxSubmesh;
+	geo->DrawArgs["grid"] = gridSubmesh;
+	geo->DrawArgs["sphere"] = sphereSubmesh;
+	geo->DrawArgs["cylinder"] = cylinderSubmesh;
+	geo->DrawArgs["pyramid"] = pyramidSubmesh;
+	geo->DrawArgs["cone"] = coneSubmesh;
+	geo->DrawArgs["diamond"] = diamondSubmesh;
+	geo->DrawArgs["wedge"] = wedgeSubmesh;
+	geo->DrawArgs["halfPyramid"] = halfPyramidSubmesh;
+	geo->DrawArgs["triSquare"] = triSquareSubmesh;
+
+
+	mGeometries[geo->Name] = std::move(geo);
 }
 
 void TreeBillboardsApp::BuildLandGeometry()
@@ -1036,8 +1336,11 @@ void TreeBillboardsApp::BuildFrameResources()
 {
     for(int i = 0; i < gNumFrameResources; ++i)
     {
-        mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-            1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));
+      /*  mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
+            1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));*/
+
+		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
+			1, (UINT)mAllRitems.size(), (UINT)mMaterials.size()));
     }
 }
 
@@ -1085,25 +1388,26 @@ void TreeBillboardsApp::BuildMaterials()
 
 void TreeBillboardsApp::BuildRenderItems()
 {
-    auto wavesRitem = std::make_unique<RenderItem>();
-    wavesRitem->World = MathHelper::Identity4x4();
-	XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	wavesRitem->ObjCBIndex = 0;
-	wavesRitem->Mat = mMaterials["water"].get();
-	wavesRitem->Geo = mGeometries["waterGeo"].get();
-	wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
-	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	BuildPrimitives();
+ //   auto wavesRitem = std::make_unique<RenderItem>();
+ //   wavesRitem->World = MathHelper::Identity4x4();
+	//XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	//wavesRitem->ObjCBIndex = 0;
+	//wavesRitem->Mat = mMaterials["water"].get();
+	//wavesRitem->Geo = mGeometries["waterGeo"].get();
+	//wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
+	//wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+	//wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 
-    mWavesRitem = wavesRitem.get();
+ //   mWavesRitem = wavesRitem.get();
 
-	mRitemLayer[(int)RenderLayer::Transparent].push_back(wavesRitem.get());
+	//mRitemLayer[(int)RenderLayer::Transparent].push_back(wavesRitem.get());
 
-    auto gridRitem = std::make_unique<RenderItem>();
+  /*  auto gridRitem = std::make_unique<RenderItem>();
     gridRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	gridRitem->ObjCBIndex = 1;
+	gridRitem->ObjCBIndex = 0;
 	gridRitem->Mat = mMaterials["grass"].get();
 	gridRitem->Geo = mGeometries["landGeo"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -1111,37 +1415,158 @@ void TreeBillboardsApp::BuildRenderItems()
     gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
     gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 
-	mRitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());*/
 
+	//auto boxRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
+	//boxRitem->ObjCBIndex = 2;
+	//boxRitem->Mat = mMaterials["wirefence"].get();
+	//boxRitem->Geo = mGeometries["boxGeo"].get();
+	//boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+	//boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+	//boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+
+	//mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
+
+	//auto treeSpritesRitem = std::make_unique<RenderItem>();
+	//treeSpritesRitem->World = MathHelper::Identity4x4();
+	//treeSpritesRitem->ObjCBIndex = 3;
+	//treeSpritesRitem->Mat = mMaterials["treeSprites"].get();
+	//treeSpritesRitem->Geo = mGeometries["treeSpritesGeo"].get();
+	////step2
+	//treeSpritesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+	//treeSpritesRitem->IndexCount = treeSpritesRitem->Geo->DrawArgs["points"].IndexCount;
+	//treeSpritesRitem->StartIndexLocation = treeSpritesRitem->Geo->DrawArgs["points"].StartIndexLocation;
+	//treeSpritesRitem->BaseVertexLocation = treeSpritesRitem->Geo->DrawArgs["points"].BaseVertexLocation;
+
+	//mRitemLayer[(int)RenderLayer::AlphaTestedTreeSprites].push_back(treeSpritesRitem.get());
+
+   // mAllRitems.push_back(std::move(wavesRitem));
+   // mAllRitems.push_back(std::move(gridRitem));
+	//mAllRitems.push_back(std::move(boxRitem));
+	//mAllRitems.push_back(std::move(treeSpritesRitem));
+}
+
+void TreeBillboardsApp::BuildPrimitives()
+{
+	//Build Box
 	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
-	boxRitem->ObjCBIndex = 2;
-	boxRitem->Mat = mMaterials["wirefence"].get();
-	boxRitem->Geo = mGeometries["boxGeo"].get();
+	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(-15.0f, 5.f, 0.0f));
+	boxRitem->ObjCBIndex = mObjCBIndex++;
+	boxRitem->Mat = mMaterials["grass"].get();
+	boxRitem->Geo = mGeometries["shapeGeo"].get();
 	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
 	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-
-	mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
-
-	auto treeSpritesRitem = std::make_unique<RenderItem>();
-	treeSpritesRitem->World = MathHelper::Identity4x4();
-	treeSpritesRitem->ObjCBIndex = 3;
-	treeSpritesRitem->Mat = mMaterials["treeSprites"].get();
-	treeSpritesRitem->Geo = mGeometries["treeSpritesGeo"].get();
-	//step2
-	treeSpritesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-	treeSpritesRitem->IndexCount = treeSpritesRitem->Geo->DrawArgs["points"].IndexCount;
-	treeSpritesRitem->StartIndexLocation = treeSpritesRitem->Geo->DrawArgs["points"].StartIndexLocation;
-	treeSpritesRitem->BaseVertexLocation = treeSpritesRitem->Geo->DrawArgs["points"].BaseVertexLocation;
-
-	mRitemLayer[(int)RenderLayer::AlphaTestedTreeSprites].push_back(treeSpritesRitem.get());
-
-    mAllRitems.push_back(std::move(wavesRitem));
-    mAllRitems.push_back(std::move(gridRitem));
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(boxRitem.get());
 	mAllRitems.push_back(std::move(boxRitem));
-	mAllRitems.push_back(std::move(treeSpritesRitem));
+
+
+	//Build Cylinder
+	auto cylRitem = std::make_unique<RenderItem>();
+	XMStoreFloat4x4(&cylRitem->World, XMMatrixTranslation(-20.0f, 5.f, 0.f));
+	cylRitem->ObjCBIndex = mObjCBIndex++;
+	cylRitem->Mat = mMaterials["grass"].get();
+	cylRitem->Geo = mGeometries["shapeGeo"].get();
+	cylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	cylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
+	cylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
+	cylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
+	mAllRitems.push_back(std::move(leftCylRitem));
+
+
+	////Build SPhere
+	//auto leftSphereRitem = std::make_unique<RenderItem>();
+	//XMMATRIX leftSphereWorld = XMMatrixTranslation(-25.0f, 5.f, 0.f);
+	//XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
+	//leftSphereRitem->color = XMFLOAT4(DirectX::Colors::Crimson);
+	//leftSphereRitem->ObjCBIndex = mObjCBIndex++;
+	//leftSphereRitem->Geo = mGeometries["shapeGeo"].get();
+	//leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
+	//leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
+	//leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(leftSphereRitem));
+
+
+	////Build Pyramid
+	//auto pyramidRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&pyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-15.0f, 5.f, 5.0f));
+	//pyramidRitem->color = XMFLOAT4(DirectX::Colors::Ivory);
+	//pyramidRitem->ObjCBIndex = mObjCBIndex++;
+	//pyramidRitem->Geo = mGeometries["shapeGeo"].get();
+	//pyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//pyramidRitem->IndexCount = pyramidRitem->Geo->DrawArgs["pyramid"].IndexCount;
+	//pyramidRitem->StartIndexLocation = pyramidRitem->Geo->DrawArgs["pyramid"].StartIndexLocation;
+	//pyramidRitem->BaseVertexLocation = pyramidRitem->Geo->DrawArgs["pyramid"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(pyramidRitem));
+
+
+	////Build COne
+	//auto coneRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&coneRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-20.0f, 5.f, 5.0f));
+	//coneRitem->color = XMFLOAT4(DirectX::Colors::Black);
+	//coneRitem->ObjCBIndex = mObjCBIndex++;
+	//coneRitem->Geo = mGeometries["shapeGeo"].get();
+	//coneRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//coneRitem->IndexCount = coneRitem->Geo->DrawArgs["cone"].IndexCount;
+	//coneRitem->StartIndexLocation = coneRitem->Geo->DrawArgs["cone"].StartIndexLocation;
+	//coneRitem->BaseVertexLocation = coneRitem->Geo->DrawArgs["cone"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(coneRitem));
+
+
+	////Build Diamond
+	//auto diamondRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&diamondRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-25.0f, 5.f, 5.0f));
+	//diamondRitem->color = XMFLOAT4(DirectX::Colors::LightPink);
+	//diamondRitem->ObjCBIndex = mObjCBIndex++;
+	//diamondRitem->Geo = mGeometries["shapeGeo"].get();
+	//diamondRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//diamondRitem->IndexCount = diamondRitem->Geo->DrawArgs["diamond"].IndexCount;
+	//diamondRitem->StartIndexLocation = diamondRitem->Geo->DrawArgs["diamond"].StartIndexLocation;
+	//diamondRitem->BaseVertexLocation = diamondRitem->Geo->DrawArgs["diamond"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(diamondRitem));
+
+
+	////BUild Wedge
+	//auto wedgeRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&wedgeRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-15.0f, 5.f, 10.0f));
+	//wedgeRitem->color = XMFLOAT4(DirectX::Colors::Magenta);
+	//wedgeRitem->ObjCBIndex = mObjCBIndex++;
+	//wedgeRitem->Geo = mGeometries["shapeGeo"].get();
+	//wedgeRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//wedgeRitem->IndexCount = wedgeRitem->Geo->DrawArgs["wedge"].IndexCount;
+	//wedgeRitem->StartIndexLocation = wedgeRitem->Geo->DrawArgs["wedge"].StartIndexLocation;
+	//wedgeRitem->BaseVertexLocation = wedgeRitem->Geo->DrawArgs["wedge"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(wedgeRitem));
+
+
+	////Build halfPyramid
+	//auto halfPyramidRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&halfPyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-20.0f, 5.f, 10.0f));
+	//halfPyramidRitem->color = XMFLOAT4(DirectX::Colors::Blue);
+	//halfPyramidRitem->ObjCBIndex = mObjCBIndex++;
+	//halfPyramidRitem->Geo = mGeometries["shapeGeo"].get();
+	//halfPyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//halfPyramidRitem->IndexCount = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].IndexCount;
+	//halfPyramidRitem->StartIndexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].StartIndexLocation;
+	//halfPyramidRitem->BaseVertexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(halfPyramidRitem));
+
+
+	////BUild triSqure
+	//auto triSquareRitem = std::make_unique<RenderItem>();
+	//XMStoreFloat4x4(&triSquareRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-25.0f, 5.f, 10.0f));
+	//triSquareRitem->color = XMFLOAT4(DirectX::Colors::Gold);
+	//triSquareRitem->ObjCBIndex = mObjCBIndex++;
+	//triSquareRitem->Geo = mGeometries["shapeGeo"].get();
+	//triSquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	//triSquareRitem->IndexCount = triSquareRitem->Geo->DrawArgs["triSquare"].IndexCount;
+	//triSquareRitem->StartIndexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].StartIndexLocation;
+	//triSquareRitem->BaseVertexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].BaseVertexLocation;
+	//mAllRitems.push_back(std::move(triSquareRitem));
 }
 
 void TreeBillboardsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
