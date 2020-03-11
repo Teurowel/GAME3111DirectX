@@ -106,7 +106,7 @@ private:
     void BuildRenderItems();
 	void BuildGround(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 	void BuildWater(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
-
+	void BuildHospital(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
 
 
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
@@ -1289,7 +1289,7 @@ void TreeBillboardsApp::BuildRenderItems()
 {
 	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3.f, 1.f, 3.f, 0.f));
 	BuildWater(XMVectorSet(0.f, 0.f, -22.5f, 0.f), XMVectorSet(0.98f, 1.f, 0.5f, 0.f));
-
+	BuildHospital(XMVectorSet(-5.f, 1.f, 12.f, 0.f));
  
 
   /*  auto gridRitem = std::make_unique<RenderItem>();
@@ -1387,127 +1387,240 @@ void TreeBillboardsApp::BuildWater(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	mAllRitems.push_back(std::move(water));
 }
 
-//void TreeBillboardsApp::BuildPrimitives()
-//{
-	////Build Box
-	//auto boxRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(-15.0f, 5.f, 0.0f));
-	//boxRitem->ObjCBIndex = mObjCBIndex++;
-	//boxRitem->Mat = mMaterials["grass"].get();
-	//boxRitem->Geo = mGeometries["shapeGeo"].get();
-	//boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	//boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	//boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(boxRitem.get());
-	//mAllRitems.push_back(std::move(boxRitem));
+void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	//Main Box
+	auto mainBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&mainBox->World, XMMatrixScaling(3.0f, 2.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&mainBox->World,
+		XMLoadFloat4x4(&mainBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	mainBox->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&mainBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	mainBox->ObjCBIndex = mObjCBIndex++;
+	mainBox->Geo = mGeometries["shapeGeo"].get();
+	mainBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	mainBox->IndexCount = mainBox->Geo->DrawArgs["box"].IndexCount;
+	mainBox->StartIndexLocation = mainBox->Geo->DrawArgs["box"].StartIndexLocation;
+	mainBox->BaseVertexLocation = mainBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(mainBox.get());
+	mAllRitems.push_back(std::move(mainBox));
 
 
-	////Build Cylinder
-	//auto cylRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&cylRitem->World, XMMatrixTranslation(-20.0f, 5.f, 0.f));
-	//cylRitem->ObjCBIndex = mObjCBIndex++;
-	//cylRitem->Mat = mMaterials["brick"].get();
-	//cylRitem->Geo = mGeometries["shapeGeo"].get();
-	//cylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//cylRitem->IndexCount = cylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-	//cylRitem->StartIndexLocation = cylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-	//cylRitem->BaseVertexLocation = cylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(cylRitem.get());
-	//mAllRitems.push_back(std::move(cylRitem));
+	//Top Box
+	auto topBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&topBox->World, XMMatrixScaling(1.0f, 1.0f, 0.6f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, 0.2f));
+
+	//World
+	XMStoreFloat4x4(&topBox->World,
+		XMLoadFloat4x4(&topBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	topBox->Mat = mMaterials["stone"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&topBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	topBox->ObjCBIndex = mObjCBIndex++;
+	topBox->Geo = mGeometries["shapeGeo"].get();
+	topBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	topBox->IndexCount = topBox->Geo->DrawArgs["box"].IndexCount;
+	topBox->StartIndexLocation = topBox->Geo->DrawArgs["box"].StartIndexLocation;
+	topBox->BaseVertexLocation = topBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(topBox.get());
+	mAllRitems.push_back(std::move(topBox));
 
 
-	////Build SPhere
-	//auto leftSphereRitem = std::make_unique<RenderItem>();
-	//XMMATRIX leftSphereWorld = XMMatrixTranslation(-25.0f, 5.f, 0.f);
-	//XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
-	//leftSphereRitem->color = XMFLOAT4(DirectX::Colors::Crimson);
-	//leftSphereRitem->ObjCBIndex = mObjCBIndex++;
-	//leftSphereRitem->Geo = mGeometries["shapeGeo"].get();
-	//leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//leftSphereRitem->IndexCount = leftSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-	//leftSphereRitem->StartIndexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-	//leftSphereRitem->BaseVertexLocation = leftSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(leftSphereRitem));
+	//Left BIg Box
+	auto leftBigBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&leftBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, 1.f, 0.3f));
+
+	//World
+	XMStoreFloat4x4(&leftBigBox->World,
+		XMLoadFloat4x4(&leftBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	leftBigBox->Mat = mMaterials["grass"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&leftBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	leftBigBox->ObjCBIndex = mObjCBIndex++;
+	leftBigBox->Geo = mGeometries["shapeGeo"].get();
+	leftBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftBigBox->IndexCount = leftBigBox->Geo->DrawArgs["box"].IndexCount;
+	leftBigBox->StartIndexLocation = leftBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftBigBox->BaseVertexLocation = leftBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(leftBigBox.get());
+	mAllRitems.push_back(std::move(leftBigBox));
 
 
-	////Build Pyramid
-	//auto pyramidRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&pyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-15.0f, 5.f, 5.0f));
-	//pyramidRitem->color = XMFLOAT4(DirectX::Colors::Ivory);
-	//pyramidRitem->ObjCBIndex = mObjCBIndex++;
-	//pyramidRitem->Geo = mGeometries["shapeGeo"].get();
-	//pyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//pyramidRitem->IndexCount = pyramidRitem->Geo->DrawArgs["pyramid"].IndexCount;
-	//pyramidRitem->StartIndexLocation = pyramidRitem->Geo->DrawArgs["pyramid"].StartIndexLocation;
-	//pyramidRitem->BaseVertexLocation = pyramidRitem->Geo->DrawArgs["pyramid"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(pyramidRitem));
+	//Right BIg Box
+	auto rightBigBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&rightBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 1.f, 0.3f));
+
+	//World
+	XMStoreFloat4x4(&rightBigBox->World,
+		XMLoadFloat4x4(&rightBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	rightBigBox->Mat = mMaterials["stone"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&rightBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	rightBigBox->ObjCBIndex = mObjCBIndex++;
+	rightBigBox->Geo = mGeometries["shapeGeo"].get();
+	rightBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightBigBox->IndexCount = rightBigBox->Geo->DrawArgs["box"].IndexCount;
+	rightBigBox->StartIndexLocation = rightBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightBigBox->BaseVertexLocation = rightBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(rightBigBox.get());
+	mAllRitems.push_back(std::move(rightBigBox));
 
 
-	////Build COne
-	//auto coneRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&coneRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-20.0f, 5.f, 5.0f));
-	//coneRitem->color = XMFLOAT4(DirectX::Colors::Black);
-	//coneRitem->ObjCBIndex = mObjCBIndex++;
-	//coneRitem->Geo = mGeometries["shapeGeo"].get();
-	//coneRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//coneRitem->IndexCount = coneRitem->Geo->DrawArgs["cone"].IndexCount;
-	//coneRitem->StartIndexLocation = coneRitem->Geo->DrawArgs["cone"].StartIndexLocation;
-	//coneRitem->BaseVertexLocation = coneRitem->Geo->DrawArgs["cone"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(coneRitem));
+	//left small Box
+	auto leftSmallBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&leftSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, -0.5f, -0.6f));
+
+	//World
+	XMStoreFloat4x4(&leftSmallBox->World,
+		XMLoadFloat4x4(&leftSmallBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	leftSmallBox->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&leftSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	leftSmallBox->ObjCBIndex = mObjCBIndex++;
+	leftSmallBox->Geo = mGeometries["shapeGeo"].get();
+	leftSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftSmallBox->IndexCount = leftSmallBox->Geo->DrawArgs["box"].IndexCount;
+	leftSmallBox->StartIndexLocation = leftSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftSmallBox->BaseVertexLocation = leftSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(leftSmallBox.get());
+	mAllRitems.push_back(std::move(leftSmallBox));
 
 
-	////Build Diamond
-	//auto diamondRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&diamondRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-25.0f, 5.f, 5.0f));
-	//diamondRitem->color = XMFLOAT4(DirectX::Colors::LightPink);
-	//diamondRitem->ObjCBIndex = mObjCBIndex++;
-	//diamondRitem->Geo = mGeometries["shapeGeo"].get();
-	//diamondRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//diamondRitem->IndexCount = diamondRitem->Geo->DrawArgs["diamond"].IndexCount;
-	//diamondRitem->StartIndexLocation = diamondRitem->Geo->DrawArgs["diamond"].StartIndexLocation;
-	//diamondRitem->BaseVertexLocation = diamondRitem->Geo->DrawArgs["diamond"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(diamondRitem));
+	//right small Box
+	auto rightSmallBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&rightSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, -0.5f, -0.6f));
+
+	//World
+	XMStoreFloat4x4(&rightSmallBox->World,
+		XMLoadFloat4x4(&rightSmallBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	rightSmallBox->Mat = mMaterials["grass"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&rightSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 
 
-	////BUild Wedge
-	//auto wedgeRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&wedgeRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-15.0f, 5.f, 10.0f));
-	//wedgeRitem->color = XMFLOAT4(DirectX::Colors::Magenta);
-	//wedgeRitem->ObjCBIndex = mObjCBIndex++;
-	//wedgeRitem->Geo = mGeometries["shapeGeo"].get();
-	//wedgeRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//wedgeRitem->IndexCount = wedgeRitem->Geo->DrawArgs["wedge"].IndexCount;
-	//wedgeRitem->StartIndexLocation = wedgeRitem->Geo->DrawArgs["wedge"].StartIndexLocation;
-	//wedgeRitem->BaseVertexLocation = wedgeRitem->Geo->DrawArgs["wedge"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(wedgeRitem));
+	rightSmallBox->ObjCBIndex = mObjCBIndex++;
+	rightSmallBox->Geo = mGeometries["shapeGeo"].get();
+	rightSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightSmallBox->IndexCount = rightSmallBox->Geo->DrawArgs["box"].IndexCount;
+	rightSmallBox->StartIndexLocation = rightSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightSmallBox->BaseVertexLocation = rightSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(rightSmallBox.get());
+	mAllRitems.push_back(std::move(rightSmallBox));
 
 
-	////Build halfPyramid
-	//auto halfPyramidRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&halfPyramidRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-20.0f, 5.f, 10.0f));
-	//halfPyramidRitem->color = XMFLOAT4(DirectX::Colors::Blue);
-	//halfPyramidRitem->ObjCBIndex = mObjCBIndex++;
-	//halfPyramidRitem->Geo = mGeometries["shapeGeo"].get();
-	//halfPyramidRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//halfPyramidRitem->IndexCount = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].IndexCount;
-	//halfPyramidRitem->StartIndexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].StartIndexLocation;
-	//halfPyramidRitem->BaseVertexLocation = halfPyramidRitem->Geo->DrawArgs["halfPyramid"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(halfPyramidRitem));
+	//Cross Vertical Box
+	auto crossVerticalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossVerticalBox->World, XMMatrixScaling(0.7f, 0.2f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossVerticalBox->World,
+		XMLoadFloat4x4(&crossVerticalBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	crossVerticalBox->Mat = mMaterials["stone"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&crossVerticalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	crossVerticalBox->ObjCBIndex = mObjCBIndex++;
+	crossVerticalBox->Geo = mGeometries["shapeGeo"].get();
+	crossVerticalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossVerticalBox->IndexCount = crossVerticalBox->Geo->DrawArgs["box"].IndexCount;
+	crossVerticalBox->StartIndexLocation = crossVerticalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossVerticalBox->BaseVertexLocation = crossVerticalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(crossVerticalBox.get());
+	mAllRitems.push_back(std::move(crossVerticalBox));
 
 
-	////BUild triSqure
-	//auto triSquareRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&triSquareRitem->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixTranslation(-25.0f, 5.f, 10.0f));
-	//triSquareRitem->color = XMFLOAT4(DirectX::Colors::Gold);
-	//triSquareRitem->ObjCBIndex = mObjCBIndex++;
-	//triSquareRitem->Geo = mGeometries["shapeGeo"].get();
-	//triSquareRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//triSquareRitem->IndexCount = triSquareRitem->Geo->DrawArgs["triSquare"].IndexCount;
-	//triSquareRitem->StartIndexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].StartIndexLocation;
-	//triSquareRitem->BaseVertexLocation = triSquareRitem->Geo->DrawArgs["triSquare"].BaseVertexLocation;
-	//mAllRitems.push_back(std::move(triSquareRitem));
-//}
+	//Cross Horizontal Box
+	auto crossHorizontalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossHorizontalBox->World, XMMatrixScaling(0.2f, 0.7f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossHorizontalBox->World,
+		XMLoadFloat4x4(&crossHorizontalBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	crossHorizontalBox->Mat = mMaterials["brick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&crossHorizontalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	crossHorizontalBox->ObjCBIndex = mObjCBIndex++;
+	crossHorizontalBox->Geo = mGeometries["shapeGeo"].get();
+	crossHorizontalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossHorizontalBox->IndexCount = crossHorizontalBox->Geo->DrawArgs["box"].IndexCount;
+	crossHorizontalBox->StartIndexLocation = crossHorizontalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossHorizontalBox->BaseVertexLocation = crossHorizontalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(crossHorizontalBox.get());
+	mAllRitems.push_back(std::move(crossHorizontalBox));
+}
 
 void TreeBillboardsApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
