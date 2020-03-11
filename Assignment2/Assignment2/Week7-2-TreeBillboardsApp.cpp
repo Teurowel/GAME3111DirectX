@@ -94,16 +94,20 @@ private:
 	void BuildDescriptorHeaps();
     void BuildShadersAndInputLayouts();
 	void BuildShapeGeometry();
-    void BuildLandGeometry();
     void BuildWavesGeometry();
-	void BuildBoxGeometry();
 	void BuildTreeSpritesGeometry();
     void BuildPSOs();
     void BuildFrameResources();
     void BuildMaterials();
 	void CreateMaterials(std::string name, XMFLOAT4 diffuseAlbedo, XMFLOAT3 fresnelR0, float roughness);
+
+
+
     void BuildRenderItems();
 	void BuildGround(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+	void BuildWater(FXMVECTOR pos, FXMVECTOR scale = XMVectorSet(1.f, 1.f, 1.f, 0.f), FXMVECTOR rotation = XMVectorSet(0.f, 0.f, 0.f, 0.f));
+
+
 
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
@@ -216,16 +220,14 @@ bool TreeBillboardsApp::Initialize()
 	// so we have to query this information.
     mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    //mWaves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+    mWaves = std::make_unique<Waves>(32, 32, 1.0f, 0.03f, 4.0f, 0.2f);
  
 	LoadTextures();
     BuildRootSignature();
 	BuildDescriptorHeaps();
     BuildShadersAndInputLayouts();
 	BuildShapeGeometry();
-    //BuildLandGeometry();
-    //BuildWavesGeometry();
-	//BuildBoxGeometry();
+    BuildWavesGeometry();
 	//BuildTreeSpritesGeometry();
 	BuildMaterials();
     BuildRenderItems();
@@ -271,11 +273,11 @@ void TreeBillboardsApp::Update(const GameTimer& gt)
         CloseHandle(eventHandle);
     }
 
-	//AnimateMaterials(gt);
+	AnimateMaterials(gt);
 	UpdateObjectCBs(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
-   //UpdateWaves(gt);
+    UpdateWaves(gt);
 }
 
 void TreeBillboardsApp::Draw(const GameTimer& gt)
@@ -1055,62 +1057,6 @@ void TreeBillboardsApp::BuildShapeGeometry()
 	mGeometries[geo->Name] = std::move(geo);
 }
 
-void TreeBillboardsApp::BuildLandGeometry()
-{
-    GeometryGenerator geoGen;
-    GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-
-    //
-    // Extract the vertex elements we are interested and apply the height function to
-    // each vertex.  In addition, color the vertices based on their height so we have
-    // sandy looking beaches, grassy low hills, and snow mountain peaks.
-    //
-
-    std::vector<Vertex> vertices(grid.Vertices.size());
-    for(size_t i = 0; i < grid.Vertices.size(); ++i)
-    {
-        auto& p = grid.Vertices[i].Position;
-        vertices[i].Pos = p;
-        vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
-        vertices[i].Normal = GetHillsNormal(p.x, p.z);
-		vertices[i].TexC = grid.Vertices[i].TexC;
-    }
-
-    const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-
-    std::vector<std::uint16_t> indices = grid.GetIndices16();
-    const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "landGeo";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["grid"] = submesh;
-
-	mGeometries["landGeo"] = std::move(geo);
-}
-
 void TreeBillboardsApp::BuildWavesGeometry()
 {
     std::vector<std::uint16_t> indices(3 * mWaves->TriangleCount()); // 3 indices per face
@@ -1162,58 +1108,9 @@ void TreeBillboardsApp::BuildWavesGeometry()
 	submesh.StartIndexLocation = 0;
 	submesh.BaseVertexLocation = 0;
 
-	geo->DrawArgs["grid"] = submesh;
+	geo->DrawArgs["water"] = submesh;
 
 	mGeometries["waterGeo"] = std::move(geo);
-}
-
-void TreeBillboardsApp::BuildBoxGeometry()
-{
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData box = geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3);
-
-	std::vector<Vertex> vertices(box.Vertices.size());
-	for (size_t i = 0; i < box.Vertices.size(); ++i)
-	{
-		auto& p = box.Vertices[i].Position;
-		vertices[i].Pos = p;
-		vertices[i].Normal = box.Vertices[i].Normal;
-		vertices[i].TexC = box.Vertices[i].TexC;
-	}
-
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-
-	std::vector<std::uint16_t> indices = box.GetIndices16();
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "boxGeo";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["box"] = submesh;
-
-	mGeometries["boxGeo"] = std::move(geo);
 }
 
 void TreeBillboardsApp::BuildTreeSpritesGeometry()
@@ -1383,32 +1280,17 @@ void TreeBillboardsApp::BuildFrameResources()
 {
     for(int i = 0; i < gNumFrameResources; ++i)
     {
-      /*  mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-            1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));*/
-
-		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, (UINT)mAllRitems.size(), (UINT)mMaterials.size()));
+        mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
+            1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));
     }
 }
 
 void TreeBillboardsApp::BuildRenderItems()
 {
-	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3, 1.f, 3.f, 0.f));
+	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3.f, 1.f, 3.f, 0.f));
+	BuildWater(XMVectorSet(0.f, 0.f, -22.5f, 0.f), XMVectorSet(0.98f, 1.f, 0.5f, 0.f));
 
- //   auto wavesRitem = std::make_unique<RenderItem>();
- //   wavesRitem->World = MathHelper::Identity4x4();
-	//XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	//wavesRitem->ObjCBIndex = 0;
-	//wavesRitem->Mat = mMaterials["water"].get();
-	//wavesRitem->Geo = mGeometries["waterGeo"].get();
-	//wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
-	//wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	//wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-
- //   mWavesRitem = wavesRitem.get();
-
-	//mRitemLayer[(int)RenderLayer::Transparent].push_back(wavesRitem.get());
+ 
 
   /*  auto gridRitem = std::make_unique<RenderItem>();
     gridRitem->World = MathHelper::Identity4x4();
@@ -1422,18 +1304,6 @@ void TreeBillboardsApp::BuildRenderItems()
     gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
 
 	mRitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());*/
-
-	//auto boxRitem = std::make_unique<RenderItem>();
-	//XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
-	//boxRitem->ObjCBIndex = 2;
-	//boxRitem->Mat = mMaterials["wirefence"].get();
-	//boxRitem->Geo = mGeometries["boxGeo"].get();
-	//boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	//boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	//boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-
-	//mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
 
 	//auto treeSpritesRitem = std::make_unique<RenderItem>();
 	//treeSpritesRitem->World = MathHelper::Identity4x4();
@@ -1483,6 +1353,38 @@ void TreeBillboardsApp::BuildGround(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR ro
 	ground->BaseVertexLocation = ground->Geo->DrawArgs["grid"].BaseVertexLocation;
 	mRitemLayer[(int)RenderLayer::Opaque].push_back(ground.get());
 	mAllRitems.push_back(std::move(ground));
+}
+
+void TreeBillboardsApp::BuildWater(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
+{
+	auto water = std::make_unique<RenderItem>();
+	
+	//Local
+	XMStoreFloat4x4(&water->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
+
+	//World
+	XMStoreFloat4x4(&water->World,
+		XMLoadFloat4x4(&water->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	water->Mat = mMaterials["water"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&water->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+
+	water->ObjCBIndex = mObjCBIndex++;
+	water->Geo = mGeometries["waterGeo"].get();
+	water->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	water->IndexCount = water->Geo->DrawArgs["water"].IndexCount;
+	water->StartIndexLocation = water->Geo->DrawArgs["water"].StartIndexLocation;
+	water->BaseVertexLocation = water->Geo->DrawArgs["water"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Transparent].push_back(water.get());
+	mWavesRitem = water.get();
+
+	mAllRitems.push_back(std::move(water));
 }
 
 //void TreeBillboardsApp::BuildPrimitives()
