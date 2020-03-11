@@ -8,7 +8,7 @@
 #endif
 
 #ifndef NUM_POINT_LIGHTS
-    #define NUM_POINT_LIGHTS 0
+    #define NUM_POINT_LIGHTS 3
 #endif
 
 #ifndef NUM_SPOT_LIGHTS
@@ -103,7 +103,11 @@ VertexOut VS(VertexIn vin)
 	VertexOut vout;
 
 	// Just pass data over to geometry shader.
-	vout.CenterW = vin.PosW;
+	//vout.CenterW = vin.PosW;
+
+	float4 posW = mul(float4(vin.PosW, 1.0f), gWorld);
+	vout.CenterW = posW.xyz;
+
 	vout.SizeW   = vin.SizeW;
 
 	return vout;
