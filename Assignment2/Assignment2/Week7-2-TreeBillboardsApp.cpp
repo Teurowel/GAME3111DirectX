@@ -580,16 +580,16 @@ void TreeBillboardsApp::UpdateMainPassCB(const GameTimer& gt)
 	
 	//Point light
 	mMainPassCB.Lights[1].Position = { -3.f, 3.f, 3.f };
-	mMainPassCB.Lights[1].Strength = { 0.f, 1.f, 0.f };
+	mMainPassCB.Lights[1].Strength = { 1.f, 1.f, 0.f };
 
 	mMainPassCB.Lights[2].Position = { 3.f, 3.f, -8.f };
-	mMainPassCB.Lights[2].Strength = { 0.f, 1.f, 0.f };
+	mMainPassCB.Lights[2].Strength = { 1.f, 1.f, 0.f };
 
 	mMainPassCB.Lights[3].Position = { 0.f, 25.f, -4.f };
-	mMainPassCB.Lights[3].Strength = { 1.f, 0.f, 0.f };
+	mMainPassCB.Lights[3].Strength = { 1.f, 1.f, 0.f };
 
 	mMainPassCB.Lights[4].Position = { -10.f, 4.f, -13.f };
-	mMainPassCB.Lights[4].Strength = { 0.f, 0.f, 1.f };
+	mMainPassCB.Lights[4].Strength = { 1.f, 1.f, 0.f };
 
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
@@ -698,6 +698,13 @@ void TreeBillboardsApp::LoadTextures()
 	CreateTexture("doorTex", L"../../Textures/door.dds");
 	CreateTexture("tileRoofTex", L"../../Textures/tileRoof.dds");
 	CreateTexture("rock4Tex", L"../../Textures/rock4.dds");
+	CreateTexture("floorTex", L"../../Textures/Floor2.dds");
+	CreateTexture("glassTex", L"../../Textures/Glass1.dds");
+	CreateTexture("glassTex2", L"../../Textures/Glass2.dds");
+	CreateTexture("glassTex3", L"../../Textures/Glass3.dds");
+	CreateTexture("glassTex4", L"../../Textures/Glass4.dds");
+	CreateTexture("WhiteTex", L"../../Textures/White.dds");
+	CreateTexture("NavyTex", L"../../Textures/Navy.dds");
 
 
 	//Texture Array
@@ -805,6 +812,13 @@ void TreeBillboardsApp::BuildMaterials()
 	CreateMaterials("door", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
 	CreateMaterials("tileRoof", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
 	CreateMaterials("rock4", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Floor2", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Glass1", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Glass2", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Glass3", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Glass4", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("White", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
+	CreateMaterials("Navy", XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT3(0.01f, 0.01f, 0.01f), 0.125f);
 
 
 
@@ -828,13 +842,13 @@ void TreeBillboardsApp::BuildShadersAndInputLayouts()
 {
 	const D3D_SHADER_MACRO defines[] =
 	{
-		"FOG", "1",
+		//"FOG", "1",
 		NULL, NULL
 	};
 
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
-		"FOG", "1",
+		//"FOG", "1",
 		"ALPHA_TEST", "1",
 		NULL, NULL
 	};
@@ -1386,7 +1400,7 @@ void TreeBillboardsApp::BuildGround(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR ro
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	ground->Mat = mMaterials["stone"].get();
+	ground->Mat = mMaterials["Floor2"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&ground->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
@@ -1449,7 +1463,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	mainBox->Mat = mMaterials["tile"].get();
+	mainBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&mainBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1478,7 +1492,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	topBox->Mat = mMaterials["redBrick"].get();
+	topBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&topBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1507,7 +1521,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	leftBigBox->Mat = mMaterials["redBrick"].get();
+	leftBigBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&leftBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1536,7 +1550,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	rightBigBox->Mat = mMaterials["redBrick"].get();
+	rightBigBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&rightBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1565,7 +1579,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	leftSmallBox->Mat = mMaterials["tile"].get();
+	leftSmallBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&leftSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1594,7 +1608,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	rightSmallBox->Mat = mMaterials["tile"].get();
+	rightSmallBox->Mat = mMaterials["White"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&rightSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1624,7 +1638,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	crossVerticalBox->Mat = mMaterials["grass"].get();
+	crossVerticalBox->Mat = mMaterials["redBrick"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&crossVerticalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1653,7 +1667,7 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	crossHorizontalBox->Mat = mMaterials["grass"].get();
+	crossHorizontalBox->Mat = mMaterials["redBrick"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&crossHorizontalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1865,7 +1879,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	upperBox->Mat = mMaterials["redBrick"].get();
+	upperBox->Mat = mMaterials["Glass2"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&upperBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -1984,7 +1998,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	firstBuilding->Mat = mMaterials["wallBrick"].get();
+	firstBuilding->Mat = mMaterials["Navy"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(3.0f, 3.0f, 1.0f));
@@ -2012,7 +2026,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	secondBuilding->Mat = mMaterials["wallBrick"].get();
+	secondBuilding->Mat = mMaterials["Navy"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&secondBuilding->TexTransform, XMMatrixScaling(3.0f, 3.0f, 1.0f));
@@ -2041,7 +2055,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	bridge->Mat = mMaterials["woodFloor"].get();
+	bridge->Mat = mMaterials["Navy"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&bridge->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2072,7 +2086,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	firstBuilding->Mat = mMaterials["tileRoof"].get();
+	firstBuilding->Mat = mMaterials["Glass3"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2100,7 +2114,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	secondFloor->Mat = mMaterials["rock4"].get();
+	secondFloor->Mat = mMaterials["Glass3"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&secondFloor->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2128,7 +2142,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	thirdFloor->Mat = mMaterials["tileRoof"].get();
+	thirdFloor->Mat = mMaterials["Glass3"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&thirdFloor->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2156,7 +2170,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	fourthFloor->Mat = mMaterials["rock4"].get();
+	fourthFloor->Mat = mMaterials["Glass3"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&fourthFloor->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2184,7 +2198,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	longFloor->Mat = mMaterials["tileRoof"].get();
+	longFloor->Mat = mMaterials["Glass3"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&longFloor->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2215,7 +2229,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	firstBuilding->Mat = mMaterials["wallBrick"].get();
+	firstBuilding->Mat = mMaterials["Glass1"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&firstBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
@@ -2444,7 +2458,7 @@ void TreeBillboardsApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation
 		XMMatrixTranslationFromVector(pos));
 
 	//Material
-	SecondBuilding->Mat = mMaterials["whiteBrick"].get();
+	SecondBuilding->Mat = mMaterials["Glass4"].get();
 
 	//Texture Scaling
 	XMStoreFloat4x4(&SecondBuilding->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
