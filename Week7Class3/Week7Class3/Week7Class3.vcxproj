@@ -153,7 +153,7 @@
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="Waves.cpp" />
     <ClCompile Include="Week6-1-BlendApp-Transparency.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Week6-2-BlendApp-NoColorWrite.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

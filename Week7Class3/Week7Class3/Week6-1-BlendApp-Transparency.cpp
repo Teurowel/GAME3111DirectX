@@ -672,7 +672,7 @@ void BlendApp::BuildShadersAndInputLayout()
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
 		"FOG", "1",
-		"ALPHA_TEST", 
+		//"ALPHA_TEST", "false",
 		NULL, NULL
 	};
 
