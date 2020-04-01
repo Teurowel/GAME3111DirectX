@@ -1,6 +1,5 @@
 //***************************************************************************************
-// Week6-4-BlendApp-Multiplying.cpp 
-//Multiplicative Blending: Suppose that we want to multiply a source pixel with its corresponding destination pixel. 
+// StencilApp.cpp with shadow
 //***************************************************************************************
 
 #include "../../Common/d3dApp.h"
@@ -8,7 +7,6 @@
 #include "../../Common/UploadBuffer.h"
 #include "../../Common/GeometryGenerator.h"
 #include "FrameResource.h"
-#include "Waves.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -24,7 +22,7 @@ const int gNumFrameResources = 3;
 struct RenderItem
 {
 	RenderItem() = default;
- 
+
     // World matrix of the shape that describes the object's local space
     // relative to the world space, which defines the position, orientation,
     // and scale of the object in the world.
@@ -45,7 +43,7 @@ struct RenderItem
 	MeshGeometry* Geo = nullptr;
 
     // Primitive topology.
-    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     // DrawIndexedInstanced parameters.
     UINT IndexCount = 0;
@@ -56,18 +54,21 @@ struct RenderItem
 enum class RenderLayer : int
 {
 	Opaque = 0,
+	Mirrors ,
+	Reflected,
 	Transparent,
-	AlphaTested,
+	//step1
+	Shadow,
 	Count
 };
 
-class BlendApp : public D3DApp
+class StencilApp : public D3DApp
 {
 public:
-    BlendApp(HINSTANCE hInstance);
-    BlendApp(const BlendApp& rhs) = delete;
-    BlendApp& operator=(const BlendApp& rhs) = delete;
-    ~BlendApp();
+    StencilApp(HINSTANCE hInstance);
+    StencilApp(const StencilApp& rhs) = delete;
+    StencilApp& operator=(const StencilApp& rhs) = delete;
+    ~StencilApp();
 
     virtual bool Initialize()override;
 
@@ -86,15 +87,14 @@ private:
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateMainPassCB(const GameTimer& gt);
-	void UpdateWaves(const GameTimer& gt); 
+	void UpdateReflectedPassCB(const GameTimer& gt);
 
 	void LoadTextures();
     void BuildRootSignature();
 	void BuildDescriptorHeaps();
     void BuildShadersAndInputLayout();
-    void BuildLandGeometry();
-    void BuildWavesGeometry();
-	void BuildBoxGeometry();
+    void BuildRoomGeometry();
+	void BuildSkullGeometry();
     void BuildPSOs();
     void BuildFrameResources();
     void BuildMaterials();
@@ -102,9 +102,6 @@ private:
     void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
-
-    float GetHillsHeight(float x, float z)const;
-    XMFLOAT3 GetHillsNormal(float x, float z)const;
 
 private:
 
@@ -125,8 +122,12 @@ private:
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
- 
-    RenderItem* mWavesRitem = nullptr;
+
+	// Cache render items of interest.
+	RenderItem* mSkullRitem = nullptr;
+	RenderItem* mReflectedSkullRitem = nullptr;
+	//step2
+	RenderItem* mShadowedSkullRitem = nullptr;
 
 	// List of all the render items.
 	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
@@ -134,17 +135,18 @@ private:
 	// Render items divided by PSO.
 	std::vector<RenderItem*> mRitemLayer[(int)RenderLayer::Count];
 
-	std::unique_ptr<Waves> mWaves;
-
     PassConstants mMainPassCB;
+	PassConstants mReflectedPassCB;
+
+	XMFLOAT3 mSkullTranslation = { 0.0f, 1.0f, -5.0f };
 
 	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-    float mTheta = 1.5f*XM_PI;
-    float mPhi = XM_PIDIV2 - 0.1f;
-    float mRadius = 50.0f;
+    float mTheta = 1.24f*XM_PI;
+    float mPhi = 0.42f*XM_PI;
+    float mRadius = 12.0f;
 
     POINT mLastMousePos;
 };
@@ -159,7 +161,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
     try
     {
-        BlendApp theApp(hInstance);
+        StencilApp theApp(hInstance);
         if(!theApp.Initialize())
             return 0;
 
@@ -172,18 +174,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
     }
 }
 
-BlendApp::BlendApp(HINSTANCE hInstance)
+StencilApp::StencilApp(HINSTANCE hInstance)
     : D3DApp(hInstance)
 {
+	mMainWndCaption = L"Shadow Demo";
 }
 
-BlendApp::~BlendApp()
+StencilApp::~StencilApp()
 {
     if(md3dDevice != nullptr)
         FlushCommandQueue();
 }
 
-bool BlendApp::Initialize()
+bool StencilApp::Initialize()
 {
     if(!D3DApp::Initialize())
         return false;
@@ -195,15 +198,12 @@ bool BlendApp::Initialize()
 	// so we have to query this information.
     mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    mWaves = std::make_unique<Waves>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
- 
 	LoadTextures();
     BuildRootSignature();
 	BuildDescriptorHeaps();
     BuildShadersAndInputLayout();
-    BuildLandGeometry();
-    BuildWavesGeometry();
-	BuildBoxGeometry();
+    BuildRoomGeometry();
+	BuildSkullGeometry();
 	BuildMaterials();
     BuildRenderItems();
     BuildFrameResources();
@@ -220,7 +220,7 @@ bool BlendApp::Initialize()
     return true;
 }
  
-void BlendApp::OnResize()
+void StencilApp::OnResize()
 {
     D3DApp::OnResize();
 
@@ -229,8 +229,9 @@ void BlendApp::OnResize()
     XMStoreFloat4x4(&mProj, P);
 }
 
-void BlendApp::Update(const GameTimer& gt)
+void StencilApp::Update(const GameTimer& gt)
 {
+	//step13: we are calling OnKeyboardInput to calculate the shadow world skulled matrix for every frame or every time user presses AWSD keyskeys
     OnKeyboardInput(gt);
 	UpdateCamera(gt);
 
@@ -252,10 +253,10 @@ void BlendApp::Update(const GameTimer& gt)
 	UpdateObjectCBs(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
-    UpdateWaves(gt);
+	UpdateReflectedPassCB(gt);
 }
 
-void BlendApp::Draw(const GameTimer& gt)
+void StencilApp::Draw(const GameTimer& gt)
 {
     auto cmdListAlloc = mCurrFrameResource->CmdListAlloc;
 
@@ -276,6 +277,9 @@ void BlendApp::Draw(const GameTimer& gt)
 
     // Clear the back buffer and depth buffer.
     mCommandList->ClearRenderTargetView(CurrentBackBufferView(), (float*)&mMainPassCB.FogColor, 0, nullptr);
+
+	//the stencil buffer should be reset to some value at the beginning of each frame.
+	//This is done with the following method(which also clears the depth buffer) :
     mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
     // Specify the buffers we are going to render to.
@@ -286,17 +290,36 @@ void BlendApp::Draw(const GameTimer& gt)
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+	UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+
+	// Draw opaque items--floors, walls, skull.
 	auto passCB = mCurrFrameResource->PassCB->Resource();
 	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
-
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
+	
+	// Mark the visible mirror pixels in the stencil buffer with the value 1
+	mCommandList->OMSetStencilRef(1);
+	mCommandList->SetPipelineState(mPSOs["markStencilMirrors"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Mirrors]);
 
-	mCommandList->SetPipelineState(mPSOs["alphaTested"].Get());
-	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::AlphaTested]);
+	// Draw the reflection into the mirror only (only for pixels where the stencil buffer is 1).
+	// Note that we must supply a different per-pass constant buffer--one with the lights reflected.
+	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
+	mCommandList->SetPipelineState(mPSOs["drawStencilReflections"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Reflected]);
 
+	// Restore main pass constants and stencil ref.
+	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
+	mCommandList->OMSetStencilRef(0);
+
+	// Draw mirror with transparency so reflection blends through.
 	mCommandList->SetPipelineState(mPSOs["transparent"].Get());
 	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Transparent]);
 
+	// step3: Draw shadows
+	mCommandList->SetPipelineState(mPSOs["shadow"].Get());
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Shadow]);
+	
     // Indicate a state transition on the resource usage.
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -315,14 +338,11 @@ void BlendApp::Draw(const GameTimer& gt)
     // Advance the fence value to mark commands up to this fence point.
     mCurrFrameResource->Fence = ++mCurrentFence;
 
-
-    // Add an instruction to the command queue to set a new fence point. 
-    // Because we are on the GPU timeline, the new fence point won't be 
-    // set until the GPU finishes processing all the commands prior to this Signal().
+    // Notify the fence when the GPU completes commands up to this fence point.
     mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
-void BlendApp::OnMouseDown(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
     mLastMousePos.x = x;
     mLastMousePos.y = y;
@@ -330,12 +350,12 @@ void BlendApp::OnMouseDown(WPARAM btnState, int x, int y)
     SetCapture(mhMainWnd);
 }
 
-void BlendApp::OnMouseUp(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
     ReleaseCapture();
 }
 
-void BlendApp::OnMouseMove(WPARAM btnState, int x, int y)
+void StencilApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
     if((btnState & MK_LBUTTON) != 0)
     {
@@ -367,11 +387,55 @@ void BlendApp::OnMouseMove(WPARAM btnState, int x, int y)
     mLastMousePos.y = y;
 }
  
-void BlendApp::OnKeyboardInput(const GameTimer& gt)
+void StencilApp::OnKeyboardInput(const GameTimer& gt)
 {
+	// step14
+	// Allow user to move skull.
+	//
+
+	const float dt = gt.DeltaTime();
+
+	if(GetAsyncKeyState('A') & 0x8000)
+		mSkullTranslation.x -= 1.0f*dt;
+
+	if(GetAsyncKeyState('D') & 0x8000)
+		mSkullTranslation.x += 1.0f*dt;
+
+	if(GetAsyncKeyState('W') & 0x8000)
+		mSkullTranslation.y += 1.0f*dt;
+
+	if(GetAsyncKeyState('S') & 0x8000)
+		mSkullTranslation.y -= 1.0f*dt;
+
+	// Don't let user move below ground plane.
+	mSkullTranslation.y = MathHelper::Max(mSkullTranslation.y, 0.0f);
+
+	// Update the new world matrix.
+	XMMATRIX skullRotate = XMMatrixRotationY(0.5f*MathHelper::Pi);
+	XMMATRIX skullScale = XMMatrixScaling(0.45f, 0.45f, 0.45f);
+	XMMATRIX skullOffset = XMMatrixTranslation(mSkullTranslation.x, mSkullTranslation.y, mSkullTranslation.z);
+	XMMATRIX skullWorld = skullRotate*skullScale*skullOffset;
+	XMStoreFloat4x4(&mSkullRitem->World, skullWorld);
+
+	// Update reflection world matrix.
+	XMVECTOR mirrorPlane = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // xy plane
+	XMMATRIX R = XMMatrixReflect(mirrorPlane);
+	XMStoreFloat4x4(&mReflectedSkullRitem->World, skullWorld * R);
+
+	// step5: Update shadow world matrix.
+	XMVECTOR shadowPlane = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); // xz plane
+	XMVECTOR toMainLight = -XMLoadFloat3(&mMainPassCB.Lights[0].Direction);
+	XMMATRIX S = XMMatrixShadow(shadowPlane, toMainLight);
+	XMMATRIX shadowOffsetY = XMMatrixTranslation(0.0f, 0.001f, 0.0f);
+	XMStoreFloat4x4(&mShadowedSkullRitem->World, skullWorld * S * shadowOffsetY);
+
+	mSkullRitem->NumFramesDirty = gNumFrameResources;
+	mReflectedSkullRitem->NumFramesDirty = gNumFrameResources;
+	//step6
+	mShadowedSkullRitem->NumFramesDirty = gNumFrameResources;
 }
  
-void BlendApp::UpdateCamera(const GameTimer& gt)
+void StencilApp::UpdateCamera(const GameTimer& gt)
 {
 	// Convert Spherical to Cartesian coordinates.
 	mEyePos.x = mRadius*sinf(mPhi)*cosf(mTheta);
@@ -387,31 +451,12 @@ void BlendApp::UpdateCamera(const GameTimer& gt)
 	XMStoreFloat4x4(&mView, view);
 }
 
-void BlendApp::AnimateMaterials(const GameTimer& gt)
+void StencilApp::AnimateMaterials(const GameTimer& gt)
 {
-	// Scroll the water material texture coordinates.
-	auto waterMat = mMaterials["water"].get();
 
-	float& tu = waterMat->MatTransform(3, 0);
-	float& tv = waterMat->MatTransform(3, 1);
-
-	tu += 0.1f * gt.DeltaTime();
-	tv += 0.02f * gt.DeltaTime();
-
-	if(tu >= 1.0f)
-		tu -= 1.0f;
-
-	if(tv >= 1.0f)
-		tv -= 1.0f;
-
-	waterMat->MatTransform(3, 0) = tu;
-	waterMat->MatTransform(3, 1) = tv;
-
-	// Material has changed, so need to update cbuffer.
-	waterMat->NumFramesDirty = gNumFrameResources;
 }
 
-void BlendApp::UpdateObjectCBs(const GameTimer& gt)
+void StencilApp::UpdateObjectCBs(const GameTimer& gt)
 {
 	auto currObjectCB = mCurrFrameResource->ObjectCB.get();
 	for(auto& e : mAllRitems)
@@ -435,7 +480,7 @@ void BlendApp::UpdateObjectCBs(const GameTimer& gt)
 	}
 }
 
-void BlendApp::UpdateMaterialCBs(const GameTimer& gt)
+void StencilApp::UpdateMaterialCBs(const GameTimer& gt)
 {
 	auto currMaterialCB = mCurrFrameResource->MaterialCB.get();
 	for(auto& e : mMaterials)
@@ -461,7 +506,7 @@ void BlendApp::UpdateMaterialCBs(const GameTimer& gt)
 	}
 }
 
-void BlendApp::UpdateMainPassCB(const GameTimer& gt)
+void StencilApp::UpdateMainPassCB(const GameTimer& gt)
 {
 	XMMATRIX view = XMLoadFloat4x4(&mView);
 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
@@ -486,85 +531,74 @@ void BlendApp::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.DeltaTime = gt.DeltaTime();
 	mMainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 	mMainPassCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
-	mMainPassCB.Lights[0].Strength = { 0.9f, 0.9f, 0.8f };
+	mMainPassCB.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
 	mMainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
 	mMainPassCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
 	mMainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
 	mMainPassCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 
+	// Main pass stored in index 0
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
 }
 
-void BlendApp::UpdateWaves(const GameTimer& gt)
+void StencilApp::UpdateReflectedPassCB(const GameTimer& gt)
 {
-	// Every quarter second, generate a random wave.
-	static float t_base = 0.0f;
-	if((mTimer.TotalTime() - t_base) >= 0.25f)
+	mReflectedPassCB = mMainPassCB;
+
+	XMVECTOR mirrorPlane = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // xy plane
+	XMMATRIX R = XMMatrixReflect(mirrorPlane);
+
+	// Reflect the lighting.
+	for(int i = 0; i < 3; ++i)
 	{
-		t_base += 0.25f;
-
-		int i = MathHelper::Rand(4, mWaves->RowCount() - 5);
-		int j = MathHelper::Rand(4, mWaves->ColumnCount() - 5);
-
-		float r = MathHelper::RandF(0.2f, 0.5f);
-
-		mWaves->Disturb(i, j, r);
+		XMVECTOR lightDir = XMLoadFloat3(&mMainPassCB.Lights[i].Direction);
+		XMVECTOR reflectedLightDir = XMVector3TransformNormal(lightDir, R);
+		XMStoreFloat3(&mReflectedPassCB.Lights[i].Direction, reflectedLightDir);
 	}
 
-	// Update the wave simulation.
-	mWaves->Update(gt.DeltaTime());
-
-	// Update the wave vertex buffer with the new solution.
-	auto currWavesVB = mCurrFrameResource->WavesVB.get();
-	for(int i = 0; i < mWaves->VertexCount(); ++i)
-	{
-		Vertex v;
-
-		v.Pos = mWaves->Position(i);
-		v.Normal = mWaves->Normal(i);
-		
-		// Derive tex-coords from position by 
-		// mapping [-w/2,w/2] --> [0,1]
-		v.TexC.x = 0.5f + v.Pos.x / mWaves->Width();
-		v.TexC.y = 0.5f - v.Pos.z / mWaves->Depth();
-
-		currWavesVB->CopyData(i, v);
-	}
-
-	// Set the dynamic VB of the wave renderitem to the current frame VB.
-	mWavesRitem->Geo->VertexBufferGPU = currWavesVB->Resource();
+	// Reflected pass stored in index 1
+	auto currPassCB = mCurrFrameResource->PassCB.get();
+	currPassCB->CopyData(1, mReflectedPassCB);
 }
 
-void BlendApp::LoadTextures()
+void StencilApp::LoadTextures()
 {
-	auto grassTex = std::make_unique<Texture>();
-	grassTex->Name = "grassTex";
-	grassTex->Filename = L"../../Textures/grass.dds";
+	auto bricksTex = std::make_unique<Texture>();
+	bricksTex->Name = "bricksTex";
+	bricksTex->Filename = L"../../Textures/bricks3.dds";
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), grassTex->Filename.c_str(),
-		grassTex->Resource, grassTex->UploadHeap));
+		mCommandList.Get(), bricksTex->Filename.c_str(),
+		bricksTex->Resource, bricksTex->UploadHeap));
 
-	auto waterTex = std::make_unique<Texture>();
-	waterTex->Name = "waterTex";
-	waterTex->Filename = L"../../Textures/water1.dds";
+	auto checkboardTex = std::make_unique<Texture>();
+	checkboardTex->Name = "checkboardTex";
+	checkboardTex->Filename = L"../../Textures/checkboard.dds";
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), waterTex->Filename.c_str(),
-		waterTex->Resource, waterTex->UploadHeap));
+		mCommandList.Get(), checkboardTex->Filename.c_str(),
+		checkboardTex->Resource, checkboardTex->UploadHeap));
 
-	auto fenceTex = std::make_unique<Texture>();
-	fenceTex->Name = "fenceTex";
-	fenceTex->Filename = L"../../Textures/WireFence.dds";
+	auto iceTex = std::make_unique<Texture>();
+	iceTex->Name = "iceTex";
+	iceTex->Filename = L"../../Textures/ice.dds";
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), fenceTex->Filename.c_str(),
-		fenceTex->Resource, fenceTex->UploadHeap));
+		mCommandList.Get(), iceTex->Filename.c_str(),
+		iceTex->Resource, iceTex->UploadHeap));
 
-	mTextures[grassTex->Name] = std::move(grassTex);
-	mTextures[waterTex->Name] = std::move(waterTex);
-	mTextures[fenceTex->Name] = std::move(fenceTex);
+	auto white1x1Tex = std::make_unique<Texture>();
+	white1x1Tex->Name = "white1x1Tex";
+	white1x1Tex->Filename = L"../../Textures/white1x1.dds";
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), white1x1Tex->Filename.c_str(),
+		white1x1Tex->Resource, white1x1Tex->UploadHeap));
+
+	mTextures[bricksTex->Name] = std::move(bricksTex);
+	mTextures[checkboardTex->Name] = std::move(checkboardTex);
+	mTextures[iceTex->Name] = std::move(iceTex);
+	mTextures[white1x1Tex->Name] = std::move(white1x1Tex);
 }
 
-void BlendApp::BuildRootSignature()
+void StencilApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE texTable;
 	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -604,13 +638,13 @@ void BlendApp::BuildRootSignature()
         IID_PPV_ARGS(mRootSignature.GetAddressOf())));
 }
 
-void BlendApp::BuildDescriptorHeaps()
+void StencilApp::BuildDescriptorHeaps()
 {
 	//
 	// Create the SRV heap.
 	//
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.NumDescriptors = 4;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -620,32 +654,39 @@ void BlendApp::BuildDescriptorHeaps()
 	//
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	auto grassTex = mTextures["grassTex"]->Resource;
-	auto waterTex = mTextures["waterTex"]->Resource;
-	auto fenceTex = mTextures["fenceTex"]->Resource;
+	auto bricksTex = mTextures["bricksTex"]->Resource;
+	auto checkboardTex = mTextures["checkboardTex"]->Resource;
+	auto iceTex = mTextures["iceTex"]->Resource;
+	auto white1x1Tex = mTextures["white1x1Tex"]->Resource;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = grassTex->GetDesc().Format;
+	srvDesc.Format = bricksTex->GetDesc().Format;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.MipLevels = -1;
-	md3dDevice->CreateShaderResourceView(grassTex.Get(), &srvDesc, hDescriptor);
+	md3dDevice->CreateShaderResourceView(bricksTex.Get(), &srvDesc, hDescriptor);
 
 	// next descriptor
 	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
 
-	srvDesc.Format = waterTex->GetDesc().Format;
-	md3dDevice->CreateShaderResourceView(waterTex.Get(), &srvDesc, hDescriptor);
+	srvDesc.Format = checkboardTex->GetDesc().Format;
+	md3dDevice->CreateShaderResourceView(checkboardTex.Get(), &srvDesc, hDescriptor);
 
 	// next descriptor
 	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
 
-	srvDesc.Format = fenceTex->GetDesc().Format;
-	md3dDevice->CreateShaderResourceView(fenceTex.Get(), &srvDesc, hDescriptor);
+	srvDesc.Format = iceTex->GetDesc().Format;
+	md3dDevice->CreateShaderResourceView(iceTex.Get(), &srvDesc, hDescriptor);
+
+	// next descriptor
+	hDescriptor.Offset(1, mCbvSrvDescriptorSize);
+
+	srvDesc.Format = white1x1Tex->GetDesc().Format;
+	md3dDevice->CreateShaderResourceView(white1x1Tex.Get(), &srvDesc, hDescriptor);
 }
 
-void BlendApp::BuildShadersAndInputLayout()
+void StencilApp::BuildShadersAndInputLayout()
 {
 	const D3D_SHADER_MACRO defines[] =
 	{
@@ -656,7 +697,7 @@ void BlendApp::BuildShadersAndInputLayout()
 	const D3D_SHADER_MACRO alphaTestDefines[] =
 	{
 		"FOG", "1",
-		"ALPHA_TEST", 
+		"ALPHA_TEST", "1",
 		NULL, NULL
 	};
 
@@ -672,34 +713,94 @@ void BlendApp::BuildShadersAndInputLayout()
     };
 }
 
-void BlendApp::BuildLandGeometry()
+void StencilApp::BuildRoomGeometry()
 {
-    GeometryGenerator geoGen;
-    GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
+    	// Create and specify geometry.  For this sample we draw a floor
+	// and a wall with a mirror on it.  We put the floor, wall, and
+	// mirror geometry in one vertex buffer.
+	//
+	//   |--------------|
+	//   |              |
+    //   |----|----|----|
+    //   |Wall|Mirr|Wall|
+	//   |    | or |    |
+    //   /--------------/
+    //  /   Floor      /
+	// /--------------/
 
-    //
-    // Extract the vertex elements we are interested and apply the height function to
-    // each vertex.  In addition, color the vertices based on their height so we have
-    // sandy looking beaches, grassy low hills, and snow mountain peaks.
-    //
+	std::array<Vertex, 20> vertices = 
+	{
+		// Floor: Observe we tile texture coordinates.
+		Vertex(-3.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 4.0f), // 0 
+		Vertex(-3.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 4.0f, 0.0f),
+		Vertex(7.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 4.0f, 4.0f),
 
-    std::vector<Vertex> vertices(grid.Vertices.size());
-    for(size_t i = 0; i < grid.Vertices.size(); ++i)
-    {
-        auto& p = grid.Vertices[i].Position;
-        vertices[i].Pos = p;
-        vertices[i].Pos.y = GetHillsHeight(p.x, p.z);
-        vertices[i].Normal = GetHillsNormal(p.x, p.z);
-		vertices[i].TexC = grid.Vertices[i].TexC;
-    }
+		// Wall: Observe we tile texture coordinates, and that we
+		// leave a gap in the middle for the mirror.
+		Vertex(-3.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 4
+		Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 0.0f),
+		Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 2.0f),
+
+		Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 8 
+		Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 0.0f),
+		Vertex(7.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 2.0f),
+
+		Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 12
+		Vertex(-3.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(7.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 0.0f),
+		Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 1.0f),
+
+		// Mirror
+		Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 16
+		Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+		Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f),
+		Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f)
+	};
+
+	std::array<std::int16_t, 30> indices = 
+	{
+		// Floor
+		0, 1, 2,	
+		0, 2, 3,
+
+		// Walls
+		4, 5, 6,
+		4, 6, 7,
+
+		8, 9, 10,
+		8, 10, 11,
+
+		12, 13, 14,
+		12, 14, 15,
+
+		// Mirror
+		16, 17, 18,
+		16, 18, 19
+	};
+
+	SubmeshGeometry floorSubmesh;
+	floorSubmesh.IndexCount = 6;
+	floorSubmesh.StartIndexLocation = 0;
+	floorSubmesh.BaseVertexLocation = 0;
+
+	SubmeshGeometry wallSubmesh;
+	wallSubmesh.IndexCount = 18;
+	wallSubmesh.StartIndexLocation = 6;
+	wallSubmesh.BaseVertexLocation = 0;
+
+	SubmeshGeometry mirrorSubmesh;
+	mirrorSubmesh.IndexCount = 6;
+	mirrorSubmesh.StartIndexLocation = 24;
+	mirrorSubmesh.BaseVertexLocation = 0;
 
     const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-
-    std::vector<std::uint16_t> indices = grid.GetIndices16();
     const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
 	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "landGeo";
+	geo->Name = "roomGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
@@ -718,93 +819,63 @@ void BlendApp::BuildLandGeometry()
 	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
+	geo->DrawArgs["floor"] = floorSubmesh;
+	geo->DrawArgs["wall"] = wallSubmesh;
+	geo->DrawArgs["mirror"] = mirrorSubmesh;
 
-	geo->DrawArgs["grid"] = submesh;
-
-	mGeometries["landGeo"] = std::move(geo);
+	mGeometries[geo->Name] = std::move(geo);
 }
 
-void BlendApp::BuildWavesGeometry()
+void StencilApp::BuildSkullGeometry()
 {
-    std::vector<std::uint16_t> indices(3 * mWaves->TriangleCount()); // 3 indices per face
-	assert(mWaves->VertexCount() < 0x0000ffff);
-
-    // Iterate over each quad.
-    int m = mWaves->RowCount();
-    int n = mWaves->ColumnCount();
-    int k = 0;
-    for(int i = 0; i < m - 1; ++i)
-    {
-        for(int j = 0; j < n - 1; ++j)
-        {
-            indices[k] = i*n + j;
-            indices[k + 1] = i*n + j + 1;
-            indices[k + 2] = (i + 1)*n + j;
-
-            indices[k + 3] = (i + 1)*n + j;
-            indices[k + 4] = i*n + j + 1;
-            indices[k + 5] = (i + 1)*n + j + 1;
-
-            k += 6; // next quad
-        }
-    }
-
-	UINT vbByteSize = mWaves->VertexCount()*sizeof(Vertex);
-	UINT ibByteSize = (UINT)indices.size()*sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "waterGeo";
-
-	// Set dynamically.
-	geo->VertexBufferCPU = nullptr;
-	geo->VertexBufferGPU = nullptr;
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
-		mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	SubmeshGeometry submesh;
-	submesh.IndexCount = (UINT)indices.size();
-	submesh.StartIndexLocation = 0;
-	submesh.BaseVertexLocation = 0;
-
-	geo->DrawArgs["grid"] = submesh;
-
-	mGeometries["waterGeo"] = std::move(geo);
-}
-
-void BlendApp::BuildBoxGeometry()
-{
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData box = geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3);
-
-	std::vector<Vertex> vertices(box.Vertices.size());
-	for (size_t i = 0; i < box.Vertices.size(); ++i)
+	std::ifstream fin("Models/skull.txt");
+	
+	if(!fin)
 	{
-		auto& p = box.Vertices[i].Position;
-		vertices[i].Pos = p;
-		vertices[i].Normal = box.Vertices[i].Normal;
-		vertices[i].TexC = box.Vertices[i].TexC;
+		MessageBox(0, L"Models/skull.txt not found.", 0, 0);
+		return;
 	}
 
+	UINT vcount = 0;
+	UINT tcount = 0;
+	std::string ignore;
+
+	fin >> ignore >> vcount;
+	fin >> ignore >> tcount;
+	fin >> ignore >> ignore >> ignore >> ignore;
+	
+	std::vector<Vertex> vertices(vcount);
+	for(UINT i = 0; i < vcount; ++i)
+	{
+		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+
+		// Model does not have texture coordinates, so just zero them out.
+		vertices[i].TexC = { 0.0f, 0.0f };
+	}
+
+	fin >> ignore;
+	fin >> ignore;
+	fin >> ignore;
+
+	std::vector<std::int32_t> indices(3 * tcount);
+	for(UINT i = 0; i < tcount; ++i)
+	{
+		fin >> indices[i*3+0] >> indices[i*3+1] >> indices[i*3+2];
+	}
+
+	fin.close();
+ 
+	//
+	// Pack the indices of all the meshes into one index buffer.
+	//
+ 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 
-	std::vector<std::uint16_t> indices = box.GetIndices16();
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::int32_t);
 
 	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "boxGeo";
+	geo->Name = "skullGeo";
 
 	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
 	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
@@ -820,7 +891,7 @@ void BlendApp::BuildBoxGeometry()
 
 	geo->VertexByteStride = sizeof(Vertex);
 	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexFormat = DXGI_FORMAT_R32_UINT;
 	geo->IndexBufferByteSize = ibByteSize;
 
 	SubmeshGeometry submesh;
@@ -828,12 +899,12 @@ void BlendApp::BuildBoxGeometry()
 	submesh.StartIndexLocation = 0;
 	submesh.BaseVertexLocation = 0;
 
-	geo->DrawArgs["box"] = submesh;
+	geo->DrawArgs["skull"] = submesh;
 
-	mGeometries["boxGeo"] = std::move(geo);
+	mGeometries[geo->Name] = std::move(geo);
 }
 
-void BlendApp::BuildPSOs()
+void StencilApp::BuildPSOs()
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 
@@ -855,6 +926,7 @@ void BlendApp::BuildPSOs()
 	};
 	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	//step1
 	opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.SampleMask = UINT_MAX;
 	opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -874,132 +946,254 @@ void BlendApp::BuildPSOs()
 	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
 	transparencyBlendDesc.BlendEnable = true;
 	transparencyBlendDesc.LogicOpEnable = false;
-
-	//Multiplying: Suppose that we want to multiply a source pixel with its corresponding destination pixel. To do this, we set 
-	//source blend factor : D3D12_BLEND_ZERO,
-	//destination blend factor : D3D12_BLEND_SRC_COLOR,
-	//the blend operator : D3D12_BLEND_OP_ADD.
-	//With this setup, the blending equation reduces to :
-
-
-	transparencyBlendDesc.SrcBlend = D3D12_BLEND_ZERO;
-	transparencyBlendDesc.DestBlend = D3D12_BLEND_SRC_COLOR;
-	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD,
-
-	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;  //default
-	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO; //default
-	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD; //default
+	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
 	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	//transparencyBlendDesc.RenderTargetWriteMask = 0;
-	//Direct3D supports rendering to up to eight render targets simultaneously.
+
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["transparent"])));
 
 	//
-	// PSO for alpha tested objects
+	// PSO for marking stencil mirrors.
 	//
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
-	alphaTestedPsoDesc.PS = 
-	{ 
-		reinterpret_cast<BYTE*>(mShaders["alphaTestedPS"]->GetBufferPointer()),
-		mShaders["alphaTestedPS"]->GetBufferSize()
-	};
-	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["alphaTested"])));
+	CD3DX12_BLEND_DESC mirrorBlendState(D3D12_DEFAULT);
+	mirrorBlendState.RenderTarget[0].RenderTargetWriteMask = 0;
+
+	D3D12_DEPTH_STENCIL_DESC mirrorDSS;
+	mirrorDSS.DepthEnable = true;
+	mirrorDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	mirrorDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	mirrorDSS.StencilEnable = true;
+	mirrorDSS.StencilReadMask = 0xff;
+	mirrorDSS.StencilWriteMask = 0xff;
+	
+	mirrorDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	mirrorDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	mirrorDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+	mirrorDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	// We are not rendering backfacing polygons, so these settings do not matter.
+	mirrorDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	mirrorDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	mirrorDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+	mirrorDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC markMirrorsPsoDesc = opaquePsoDesc;
+	markMirrorsPsoDesc.BlendState = mirrorBlendState;
+	markMirrorsPsoDesc.DepthStencilState = mirrorDSS;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&markMirrorsPsoDesc, IID_PPV_ARGS(&mPSOs["markStencilMirrors"])));
+
+	//
+	// PSO for stencil reflections.
+	//
+
+	D3D12_DEPTH_STENCIL_DESC reflectionsDSS;
+	reflectionsDSS.DepthEnable = true;
+	reflectionsDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	reflectionsDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	reflectionsDSS.StencilEnable = true;
+	reflectionsDSS.StencilReadMask = 0xff;
+	reflectionsDSS.StencilWriteMask = 0xff;
+
+	reflectionsDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+
+	// We are not rendering backfacing polygons, so these settings do not matter.
+	reflectionsDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	reflectionsDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC drawReflectionsPsoDesc = opaquePsoDesc;
+	drawReflectionsPsoDesc.DepthStencilState = reflectionsDSS;
+	drawReflectionsPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	//Comment the following line to modify the “Mirror” demo by not reversing the triangle winding order convention
+	drawReflectionsPsoDesc.RasterizerState.FrontCounterClockwise = true;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&drawReflectionsPsoDesc, IID_PPV_ARGS(&mPSOs["drawStencilReflections"])));
+
+	//step7
+	// PSO for shadow objects
+	//
+
+	D3D12_DEPTH_STENCIL_DESC shadowDSS;
+	shadowDSS.DepthEnable = true;
+	shadowDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	shadowDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	shadowDSS.StencilEnable = true;
+	shadowDSS.StencilReadMask = 0xff;
+	shadowDSS.StencilWriteMask = 0xff;
+
+	shadowDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	shadowDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+
+	shadowDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_INCR;
+
+	// Uncomment this line to see the effect if double blending
+	//shadowDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+
+	shadowDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+
+	// We are not rendering backfacing polygons, so these settings do not matter.
+	shadowDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	shadowDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	shadowDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_INCR;
+	shadowDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+
+	// We are going to draw shadows with transparency, so base it off the transparency description.
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowPsoDesc = transparentPsoDesc;
+
+	//what happens if we base our shadow PSO base off opaque description
+	//shadowPsoDesc = opaquePsoDesc;
+
+	shadowPsoDesc.DepthStencilState = shadowDSS;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&shadowPsoDesc, IID_PPV_ARGS(&mPSOs["shadow"])));
 }
 
-void BlendApp::BuildFrameResources()
+void StencilApp::BuildFrameResources()
 {
     for(int i = 0; i < gNumFrameResources; ++i)
     {
         mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-            1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));
+            2, (UINT)mAllRitems.size(), (UINT)mMaterials.size()));
     }
 }
 
-void BlendApp::BuildMaterials()
+void StencilApp::BuildMaterials()
 {
-	auto grass = std::make_unique<Material>();
-	grass->Name = "grass";
-	grass->MatCBIndex = 0;
-	grass->DiffuseSrvHeapIndex = 0;
-	grass->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass->Roughness = 0.125f;
+	auto bricks = std::make_unique<Material>();
+	bricks->Name = "bricks";
+	bricks->MatCBIndex = 0;
+	bricks->DiffuseSrvHeapIndex = 0;
+	bricks->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	bricks->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	bricks->Roughness = 0.25f;
 
-	// This is not a good water material definition, but we do not have all the rendering
-	// tools we need (transparency, environment reflection), so we fake it for now.
-	auto water = std::make_unique<Material>();
-	water->Name = "water";
-	water->MatCBIndex = 1;
-	water->DiffuseSrvHeapIndex = 1;
-	water->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
-	water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	water->Roughness = 0.0f;
+	auto checkertile = std::make_unique<Material>();
+	checkertile->Name = "checkertile";
+	checkertile->MatCBIndex = 1;
+	checkertile->DiffuseSrvHeapIndex = 1;
+	checkertile->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	checkertile->FresnelR0 = XMFLOAT3(0.07f, 0.07f, 0.07f);
+	checkertile->Roughness = 0.3f;
 
-	auto wirefence = std::make_unique<Material>();
-	wirefence->Name = "wirefence";
-	wirefence->MatCBIndex = 2;
-	wirefence->DiffuseSrvHeapIndex = 2;
-	wirefence->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	wirefence->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	wirefence->Roughness = 0.25f;
+	auto icemirror = std::make_unique<Material>();
+	icemirror->Name = "icemirror";
+	icemirror->MatCBIndex = 2;
+	icemirror->DiffuseSrvHeapIndex = 2;
+	icemirror->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.3f);
+	icemirror->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	icemirror->Roughness = 0.5f;
 
-	mMaterials["grass"] = std::move(grass);
-	mMaterials["water"] = std::move(water);
-	mMaterials["wirefence"] = std::move(wirefence);
+	auto skullMat = std::make_unique<Material>();
+	skullMat->Name = "skullMat";
+	skullMat->MatCBIndex = 3;
+	skullMat->DiffuseSrvHeapIndex = 3;
+	skullMat->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	skullMat->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	skullMat->Roughness = 0.3f;
+
+	//step8
+	auto shadowMat = std::make_unique<Material>();
+	shadowMat->Name = "shadowMat";
+	shadowMat->MatCBIndex = 4;
+	shadowMat->DiffuseSrvHeapIndex = 3;
+	shadowMat->DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.5f);
+	shadowMat->FresnelR0 = XMFLOAT3(0.001f, 0.001f, 0.001f);
+	shadowMat->Roughness = 0.0f;
+
+	mMaterials["bricks"] = std::move(bricks);
+	mMaterials["checkertile"] = std::move(checkertile);
+	mMaterials["icemirror"] = std::move(icemirror);
+	mMaterials["skullMat"] = std::move(skullMat);
+	//step9
+	mMaterials["shadowMat"] = std::move(shadowMat);
 }
 
-void BlendApp::BuildRenderItems()
+void StencilApp::BuildRenderItems()
 {
-    auto wavesRitem = std::make_unique<RenderItem>();
-    wavesRitem->World = MathHelper::Identity4x4();
-	XMStoreFloat4x4(&wavesRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	wavesRitem->ObjCBIndex = 0;
-	wavesRitem->Mat = mMaterials["water"].get();
-	wavesRitem->Geo = mGeometries["waterGeo"].get();
-	wavesRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	wavesRitem->IndexCount = wavesRitem->Geo->DrawArgs["grid"].IndexCount;
-	wavesRitem->StartIndexLocation = wavesRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	wavesRitem->BaseVertexLocation = wavesRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	auto floorRitem = std::make_unique<RenderItem>();
+	floorRitem->World = MathHelper::Identity4x4();
+	floorRitem->TexTransform = MathHelper::Identity4x4();
+	floorRitem->ObjCBIndex = 0;
+	floorRitem->Mat = mMaterials["checkertile"].get();
+	floorRitem->Geo = mGeometries["roomGeo"].get();
+	floorRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	floorRitem->IndexCount = floorRitem->Geo->DrawArgs["floor"].IndexCount;
+	floorRitem->StartIndexLocation = floorRitem->Geo->DrawArgs["floor"].StartIndexLocation;
+	floorRitem->BaseVertexLocation = floorRitem->Geo->DrawArgs["floor"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(floorRitem.get());
 
-    mWavesRitem = wavesRitem.get();
+    auto wallsRitem = std::make_unique<RenderItem>();
+	wallsRitem->World = MathHelper::Identity4x4();
+	wallsRitem->TexTransform = MathHelper::Identity4x4();
+	wallsRitem->ObjCBIndex = 1;
+	wallsRitem->Mat = mMaterials["bricks"].get();
+	wallsRitem->Geo = mGeometries["roomGeo"].get();
+	wallsRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	wallsRitem->IndexCount = wallsRitem->Geo->DrawArgs["wall"].IndexCount;
+	wallsRitem->StartIndexLocation = wallsRitem->Geo->DrawArgs["wall"].StartIndexLocation;
+	wallsRitem->BaseVertexLocation = wallsRitem->Geo->DrawArgs["wall"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(wallsRitem.get());
 
-	mRitemLayer[(int)RenderLayer::Transparent].push_back(wavesRitem.get());
+	auto skullRitem = std::make_unique<RenderItem>();
+	skullRitem->World = MathHelper::Identity4x4();
+	skullRitem->TexTransform = MathHelper::Identity4x4();
+	skullRitem->ObjCBIndex = 2;
+	skullRitem->Mat = mMaterials["skullMat"].get();
+	skullRitem->Geo = mGeometries["skullGeo"].get();
+	skullRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	skullRitem->IndexCount = skullRitem->Geo->DrawArgs["skull"].IndexCount;
+	skullRitem->StartIndexLocation = skullRitem->Geo->DrawArgs["skull"].StartIndexLocation;
+	skullRitem->BaseVertexLocation = skullRitem->Geo->DrawArgs["skull"].BaseVertexLocation;
+	mSkullRitem = skullRitem.get();
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(skullRitem.get());
 
-    auto gridRitem = std::make_unique<RenderItem>();
-    gridRitem->World = MathHelper::Identity4x4();
-	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	gridRitem->ObjCBIndex = 1;
-	gridRitem->Mat = mMaterials["grass"].get();
-	gridRitem->Geo = mGeometries["landGeo"].get();
-	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
-    gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-    gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+	// Reflected skull will have different world matrix, so it needs to be its own render item.
+	auto reflectedSkullRitem = std::make_unique<RenderItem>();
+	*reflectedSkullRitem = *skullRitem;
+	reflectedSkullRitem->ObjCBIndex = 3;
+	mReflectedSkullRitem = reflectedSkullRitem.get();
+	mRitemLayer[(int)RenderLayer::Reflected].push_back(reflectedSkullRitem.get());
 
-	mRitemLayer[(int)RenderLayer::Opaque].push_back(gridRitem.get());
+	// step10: Shadowed skull will have different world matrix, so it needs to be its own render item.
+	auto shadowedSkullRitem = std::make_unique<RenderItem>();
+	*shadowedSkullRitem = *skullRitem;
+	shadowedSkullRitem->ObjCBIndex = 4;
+	shadowedSkullRitem->Mat = mMaterials["shadowMat"].get();
+	mShadowedSkullRitem = shadowedSkullRitem.get();
+	mRitemLayer[(int)RenderLayer::Shadow].push_back(shadowedSkullRitem.get());
 
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixTranslation(3.0f, 2.0f, -9.0f));
-	boxRitem->ObjCBIndex = 2;
-	boxRitem->Mat = mMaterials["wirefence"].get();
-	boxRitem->Geo = mGeometries["boxGeo"].get();
-	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+	auto mirrorRitem = std::make_unique<RenderItem>();
+	mirrorRitem->World = MathHelper::Identity4x4();
+	mirrorRitem->TexTransform = MathHelper::Identity4x4();
+	mirrorRitem->ObjCBIndex = 5;
+	mirrorRitem->Mat = mMaterials["icemirror"].get();
+	mirrorRitem->Geo = mGeometries["roomGeo"].get();
+	mirrorRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	mirrorRitem->IndexCount = mirrorRitem->Geo->DrawArgs["mirror"].IndexCount;
+	mirrorRitem->StartIndexLocation = mirrorRitem->Geo->DrawArgs["mirror"].StartIndexLocation;
+	mirrorRitem->BaseVertexLocation = mirrorRitem->Geo->DrawArgs["mirror"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Mirrors].push_back(mirrorRitem.get());
+	mRitemLayer[(int)RenderLayer::Transparent].push_back(mirrorRitem.get());
 
-	mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
-
-    mAllRitems.push_back(std::move(wavesRitem));
-    mAllRitems.push_back(std::move(gridRitem));
-	mAllRitems.push_back(std::move(boxRitem));
+	mAllRitems.push_back(std::move(floorRitem));
+	mAllRitems.push_back(std::move(wallsRitem));
+	mAllRitems.push_back(std::move(skullRitem));
+	mAllRitems.push_back(std::move(reflectedSkullRitem));
+	//step11
+	mAllRitems.push_back(std::move(shadowedSkullRitem));
+	mAllRitems.push_back(std::move(mirrorRitem));
 }
 
-void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+void StencilApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
     UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
     UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
@@ -1030,7 +1224,7 @@ void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
     }
 }
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> BlendApp::GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> StencilApp::GetStaticSamplers()
 {
 	// Applications usually only need a handful of samplers.  So just define them all up front
 	// and keep them available as part of the root signature.  
@@ -1085,23 +1279,4 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> BlendApp::GetStaticSamplers()
 		pointWrap, pointClamp,
 		linearWrap, linearClamp, 
 		anisotropicWrap, anisotropicClamp };
-}
-
-float BlendApp::GetHillsHeight(float x, float z)const
-{
-    return 0.3f*(z*sinf(0.1f*x) + x*cosf(0.1f*z));
-}
-
-XMFLOAT3 BlendApp::GetHillsNormal(float x, float z)const
-{
-    // n = (-df/dx, 1, -df/dz)
-    XMFLOAT3 n(
-        -0.03f*z*cosf(0.1f*x) - 0.3f*cosf(0.1f*z),
-        1.0f,
-        -0.3f*sinf(0.1f*x) + 0.03f*x*sinf(0.1f*z));
-
-    XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&n));
-    XMStoreFloat3(&n, unitNormal);
-
-    return n;
 }
