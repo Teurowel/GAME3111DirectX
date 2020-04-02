@@ -6,6 +6,7 @@
 #include "../../Common/MathHelper.h"
 #include "../../Common/UploadBuffer.h"
 #include "../../Common/GeometryGenerator.h"
+#include "../../Common/Camera.h"
 #include "FrameResource.h"
 #include "Waves.h"
 
@@ -81,7 +82,7 @@ private:
     virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
 
     void OnKeyboardInput(const GameTimer& gt);
-	void UpdateCamera(const GameTimer& gt);
+	//void UpdateCamera(const GameTimer& gt);
 	void AnimateMaterials(const GameTimer& gt);
 	void UpdateObjectCBs(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
@@ -159,17 +160,19 @@ private:
 
 	bool mIsWireframe = false;
 
-	XMFLOAT3 mEyePos = { 0.0f, 5.0f, -40.0f };
-	XMFLOAT3 mFront = { 0.f, 0.f, 1.f };
-	XMFLOAT3 mRight = { 1.f, 0.f, 0.f };
-	XMFLOAT3 mUp = { 0.f ,1.f, 0.f };
-	XMFLOAT4X4 mView = MathHelper::Identity4x4();
-	XMFLOAT4X4 mProj = MathHelper::Identity4x4();
+	//XMFLOAT3 mEyePos = { 0.0f, 5.0f, -40.0f };
+	//XMFLOAT3 mFront = { 0.f, 0.f, 1.f };
+	//XMFLOAT3 mRight = { 1.f, 0.f, 0.f };
+	//XMFLOAT3 mUp = { 0.f ,1.f, 0.f };
+	//XMFLOAT4X4 mView = MathHelper::Identity4x4();
+	//XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-	float mTheta = 0.f;// 1.5f * XM_PI;
-	float mPhi = 0.f;// 0.2f * XM_PI;
-	float mRadius = 15.0f;
-	float mCameraSpeed = 10.f;
+	//float mTheta = 0.f;// 1.5f * XM_PI;
+	//float mPhi = 0.f;// 0.2f * XM_PI;
+	//float mRadius = 15.0f;
+	//float mCameraSpeed = 10.f;
+
+	Camera mCamera;
 
     POINT mLastMousePos;
 
@@ -228,6 +231,8 @@ bool TreeBillboardsApp::Initialize()
 	// so we have to query this information.
     mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+	mCamera.SetPosition(0.f, 5.0f, -40.0f);
+
     mWaves = std::make_unique<Waves>(32, 32, 1.0f, 0.03f, 4.0f, 0.2f);
  
 	LoadTextures();
@@ -258,14 +263,18 @@ void TreeBillboardsApp::OnResize()
     D3DApp::OnResize();
 
     // The window resized, so update the aspect ratio and recompute the projection matrix.
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-    XMStoreFloat4x4(&mProj, P);
+   // XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+   // XMStoreFloat4x4(&mProj, P);
+
+	//step2: When the window is resized, we no longer rebuild the projection matrix explicitly, 
+	//and instead delegate the work to the Camera class with SetLens:
+	mCamera.SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 }
 
 void TreeBillboardsApp::Update(const GameTimer& gt)
 {
     OnKeyboardInput(gt);
-	UpdateCamera(gt);
+	//UpdateCamera(gt);
 
     // Cycle through the circular frame resource array.
     mCurrFrameResourceIndex = (mCurrFrameResourceIndex + 1) % gNumFrameResources;
@@ -379,12 +388,17 @@ void TreeBillboardsApp::OnMouseMove(WPARAM btnState, int x, int y)
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
 		// Update angles based on input to orbit camera around box.
-		mTheta += dx;
-		mPhi -= dy;
+		//mTheta += dx;
+		//mPhi -= dy;
 
 		// Restrict the angle mPhi.
 		//mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
-		mPhi = MathHelper::Clamp(mPhi, -MathHelper::Pi * 0.5f + 0.1f, MathHelper::Pi * 0.5f - 0.1f);
+		//mPhi = MathHelper::Clamp(mPhi, -MathHelper::Pi * 0.5f + 0.1f, MathHelper::Pi * 0.5f - 0.1f);
+
+		//step4: Instead of updating the angles based on input to orbit camera around scene, 
+		//we rotate the camera’s look direction:
+		mCamera.Pitch(dy);
+		mCamera.RotateY(dx);
 	}
 	//else if ((btnState & MK_RBUTTON) != 0)
 	//{
@@ -410,70 +424,100 @@ void TreeBillboardsApp::OnKeyboardInput(const GameTimer& gt)
 	else
 		mIsWireframe = false;
 
-	//w
-	if (GetAsyncKeyState(0x57) & 0x8000)
-	{
-		mEyePos.x += mFront.x * mCameraSpeed * gt.DeltaTime();
-		mEyePos.y += mFront.y * mCameraSpeed * gt.DeltaTime();
-		mEyePos.z += mFront.z * mCameraSpeed * gt.DeltaTime();
-	}
-	//s
-	if (GetAsyncKeyState(0x53) & 0x8000)
-	{
-		mEyePos.x -= mFront.x * mCameraSpeed * gt.DeltaTime();
-		mEyePos.y -= mFront.y * mCameraSpeed * gt.DeltaTime();
-		mEyePos.z -= mFront.z * mCameraSpeed * gt.DeltaTime();
-	}
-	//a
-	if (GetAsyncKeyState(0x41) & 0x8000)
-	{
-		mEyePos.x -= mRight.x * mCameraSpeed * gt.DeltaTime();
-		mEyePos.y -= mRight.y * mCameraSpeed * gt.DeltaTime();
-		mEyePos.z -= mRight.z * mCameraSpeed * gt.DeltaTime();
-	}
-	//d
-	if (GetAsyncKeyState(0x44) & 0x8000)
-	{
-		mEyePos.x += mRight.x * mCameraSpeed * gt.DeltaTime();
-		mEyePos.y += mRight.y * mCameraSpeed * gt.DeltaTime();
-		mEyePos.z += mRight.z * mCameraSpeed * gt.DeltaTime();
-	}
+	////w
+	//if (GetAsyncKeyState(0x57) & 0x8000)
+	//{
+	//	mEyePos.x += mFront.x * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.y += mFront.y * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.z += mFront.z * mCameraSpeed * gt.DeltaTime();
+	//}
+	////s
+	//if (GetAsyncKeyState(0x53) & 0x8000)
+	//{
+	//	mEyePos.x -= mFront.x * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.y -= mFront.y * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.z -= mFront.z * mCameraSpeed * gt.DeltaTime();
+	//}
+	////a
+	//if (GetAsyncKeyState(0x41) & 0x8000)
+	//{
+	//	mEyePos.x -= mRight.x * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.y -= mRight.y * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.z -= mRight.z * mCameraSpeed * gt.DeltaTime();
+	//}
+	////d
+	//if (GetAsyncKeyState(0x44) & 0x8000)
+	//{
+	//	mEyePos.x += mRight.x * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.y += mRight.y * mCameraSpeed * gt.DeltaTime();
+	//	mEyePos.z += mRight.z * mCameraSpeed * gt.DeltaTime();
+	//}
+
+	const float dt = gt.DeltaTime();
+
+	//GetAsyncKeyState returns a short (2 bytes)
+	if (GetAsyncKeyState('W') & 0x8000) //most significant bit (MSB) is 1 when key is pressed (1000 000 000 000)
+		mCamera.Walk(10.0f * dt);
+
+	if (GetAsyncKeyState('S') & 0x8000)
+		mCamera.Walk(-10.0f * dt);
+
+	if (GetAsyncKeyState('A') & 0x8000)
+		mCamera.Strafe(-10.0f * dt);
+
+	if (GetAsyncKeyState('D') & 0x8000)
+		mCamera.Strafe(10.0f * dt);
+
+	//step1
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
+		mCamera.Pedestal(10.0f * dt);
+
+	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+		mCamera.Pedestal(-10.0f * dt);
+
+	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+		mCamera.Roll(10.0f * dt);
+
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+		mCamera.Roll(-10.0f * dt);
+
+	mCamera.UpdateViewMatrix();
 }
  
-void TreeBillboardsApp::UpdateCamera(const GameTimer& gt)
-{
-	// Convert Spherical to Cartesian coordinates.
-//mEyePos.x = mRadius * sinf(mPhi) * cosf(mTheta);
-//mEyePos.z = mRadius * sinf(mPhi) * sinf(mTheta);
-//mEyePos.y = mRadius * cosf(mPhi);
-
-//mTheta == Yaw, mPhi == Pitch
-
-	mFront.x = sin(mTheta) * cos(mPhi);
-	mFront.y = sin(mPhi);
-	mFront.z = cos(mTheta) * cos(mPhi);
-
-	//calculate front vector
-	XMVECTOR front = XMVector3Normalize(XMLoadFloat3(&mFront));
-	XMStoreFloat3(&mFront, front);
-
-	//calculate right vector
-	XMVECTOR right = XMVector3Normalize(XMVector3Cross(XMVectorSet(0.f, 1.f, 0.f, 0.f), front));
-	XMStoreFloat3(&mRight, right);
-
-	//calculate up vector
-	XMVECTOR up = XMVector3Normalize(XMVector3Cross(front, right));
-	XMStoreFloat3(&mUp, up);
-
-	// Build the view matrix.
-	XMVECTOR pos = XMVectorSet(mEyePos.x, mEyePos.y, mEyePos.z, 1.0f);
-	//XMVECTOR target = XMVectorZero();
-	XMVECTOR target = pos + front;
-	//XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&mView, view);
-}
+//void TreeBillboardsApp::UpdateCamera(const GameTimer& gt)
+//{
+//	// Convert Spherical to Cartesian coordinates.
+////mEyePos.x = mRadius * sinf(mPhi) * cosf(mTheta);
+////mEyePos.z = mRadius * sinf(mPhi) * sinf(mTheta);
+////mEyePos.y = mRadius * cosf(mPhi);
+//
+////mTheta == Yaw, mPhi == Pitch
+//
+//	mFront.x = sin(mTheta) * cos(mPhi);
+//	mFront.y = sin(mPhi);
+//	mFront.z = cos(mTheta) * cos(mPhi);
+//
+//	//calculate front vector
+//	XMVECTOR front = XMVector3Normalize(XMLoadFloat3(&mFront));
+//	XMStoreFloat3(&mFront, front);
+//
+//	//calculate right vector
+//	XMVECTOR right = XMVector3Normalize(XMVector3Cross(XMVectorSet(0.f, 1.f, 0.f, 0.f), front));
+//	XMStoreFloat3(&mRight, right);
+//
+//	//calculate up vector
+//	XMVECTOR up = XMVector3Normalize(XMVector3Cross(front, right));
+//	XMStoreFloat3(&mUp, up);
+//
+//	// Build the view matrix.
+//	XMVECTOR pos = XMVectorSet(mEyePos.x, mEyePos.y, mEyePos.z, 1.0f);
+//	//XMVECTOR target = XMVectorZero();
+//	XMVECTOR target = pos + front;
+//	//XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+//
+//	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+//	XMStoreFloat4x4(&mView, view);
+//}
 
 void TreeBillboardsApp::AnimateMaterials(const GameTimer& gt)
 {
@@ -551,8 +595,10 @@ void TreeBillboardsApp::UpdateMaterialCBs(const GameTimer& gt)
 
 void TreeBillboardsApp::UpdateMainPassCB(const GameTimer& gt)
 {
-	XMMATRIX view = XMLoadFloat4x4(&mView);
-	XMMATRIX proj = XMLoadFloat4x4(&mProj);
+	/*XMMATRIX view = XMLoadFloat4x4(&mView);
+	XMMATRIX proj = XMLoadFloat4x4(&mProj);*/
+	XMMATRIX view = mCamera.GetView();
+	XMMATRIX proj = mCamera.GetProj();
 
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -565,7 +611,8 @@ void TreeBillboardsApp::UpdateMainPassCB(const GameTimer& gt)
 	XMStoreFloat4x4(&mMainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mMainPassCB.ViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mMainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
-	mMainPassCB.EyePosW = mEyePos;
+	//mMainPassCB.EyePosW = mEyePos;
+	mMainPassCB.EyePosW = mCamera.GetPosition3f();
 	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
 	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
 	mMainPassCB.NearZ = 1.0f;
