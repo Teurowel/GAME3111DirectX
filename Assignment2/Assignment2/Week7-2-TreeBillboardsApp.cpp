@@ -239,7 +239,7 @@ bool TreeBillboardsApp::Initialize()
 
 	mCamera.SetPosition(0.f, 5.0f, -40.0f);
 	mCameraBoundbox.Center = mCamera.GetPosition3f();
-	mCameraBoundbox.Extents = XMFLOAT3(1.3f, 1.3f, 1.3f);
+	mCameraBoundbox.Extents = XMFLOAT3(1.1f, 1.1f, 1.1f);
 
     mWaves = std::make_unique<Waves>(32, 32, 1.0f, 0.03f, 4.0f, 0.2f);
  
@@ -302,7 +302,7 @@ void TreeBillboardsApp::Update(const GameTimer& gt)
 	UpdateObjectCBs(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
-   // UpdateWaves(gt);
+    UpdateWaves(gt);
 }
 
 void TreeBillboardsApp::Draw(const GameTimer& gt)
@@ -431,35 +431,6 @@ void TreeBillboardsApp::OnKeyboardInput(const GameTimer& gt)
 		mIsWireframe = true;
 	else
 		mIsWireframe = false;
-
-	////w
-	//if (GetAsyncKeyState(0x57) & 0x8000)
-	//{
-	//	mEyePos.x += mFront.x * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.y += mFront.y * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.z += mFront.z * mCameraSpeed * gt.DeltaTime();
-	//}
-	////s
-	//if (GetAsyncKeyState(0x53) & 0x8000)
-	//{
-	//	mEyePos.x -= mFront.x * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.y -= mFront.y * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.z -= mFront.z * mCameraSpeed * gt.DeltaTime();
-	//}
-	////a
-	//if (GetAsyncKeyState(0x41) & 0x8000)
-	//{
-	//	mEyePos.x -= mRight.x * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.y -= mRight.y * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.z -= mRight.z * mCameraSpeed * gt.DeltaTime();
-	//}
-	////d
-	//if (GetAsyncKeyState(0x44) & 0x8000)
-	//{
-	//	mEyePos.x += mRight.x * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.y += mRight.y * mCameraSpeed * gt.DeltaTime();
-	//	mEyePos.z += mRight.z * mCameraSpeed * gt.DeltaTime();
-	//}
 
 	const float dt = gt.DeltaTime();
 
@@ -1110,69 +1081,170 @@ void TreeBillboardsApp::BuildShapeGeometry()
 	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
 	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
 	boxSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = grid.Vertices[i].Position;
 		vertices[k].Normal = grid.Vertices[i].Normal;
 		vertices[k].TexC = grid.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&grid.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	gridSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = sphere.Vertices[i].Position;
 		vertices[k].Normal = sphere.Vertices[i].Normal;
 		vertices[k].TexC = sphere.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&sphere.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	sphereSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = cylinder.Vertices[i].Position;
 		vertices[k].Normal = cylinder.Vertices[i].Normal;
 		vertices[k].TexC = cylinder.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&cylinder.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	cylinderSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < pyramid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = pyramid.Vertices[i].Position;
 		vertices[k].Normal = pyramid.Vertices[i].Normal;
 		vertices[k].TexC = pyramid.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&pyramid.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	pyramidSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < cone.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = cone.Vertices[i].Position;
 		vertices[k].Normal = cone.Vertices[i].Normal;
 		vertices[k].TexC = cone.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&cone.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	coneSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < diamond.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = diamond.Vertices[i].Position;
 		vertices[k].Normal = diamond.Vertices[i].Normal;
 		vertices[k].TexC = diamond.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&diamond.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	diamondSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < wedge.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = wedge.Vertices[i].Position;
 		vertices[k].Normal = wedge.Vertices[i].Normal;
 		vertices[k].TexC = wedge.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&wedge.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	wedgeSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 	for (size_t i = 0; i < halfPyramid.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = halfPyramid.Vertices[i].Position;
 		vertices[k].Normal = halfPyramid.Vertices[i].Normal;
 		vertices[k].TexC = halfPyramid.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&halfPyramid.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	halfPyramidSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
+
 
 	for (size_t i = 0; i < triSquare.Vertices.size(); ++i, ++k)
 	{
 		vertices[k].Pos = triSquare.Vertices[i].Position;
 		vertices[k].Normal = triSquare.Vertices[i].Normal;
 		vertices[k].TexC = triSquare.Vertices[i].TexC;
+
+		//Calculate Bound Box
+		XMVECTOR P = XMLoadFloat3(&triSquare.Vertices[i].Position);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&bounds.Center, 0.5f * (vMin + vMax));
+	XMStoreFloat3(&bounds.Extents, 0.5f * (vMax - vMin));
+	triSquareSubmesh.Bounds = bounds;
+	vMin = XMLoadFloat3(&vMinf3);
+	vMax = XMLoadFloat3(&vMaxf3);
 
 
 
@@ -1462,26 +1534,26 @@ void TreeBillboardsApp::BuildFrameResources()
 
 void TreeBillboardsApp::BuildRenderItems()
 {
-//	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3.f, 1.f, 3.f, 0.f));
-//	BuildWater(XMVectorSet(0.f, 0.f, -22.5f, 0.f), XMVectorSet(0.98f, 1.f, 0.5f, 0.f));
+	BuildGround(XMVectorSet(0.f, 0.f, 0.f, 0.f), XMVectorSet(3.f, 1.f, 3.f, 0.f));
+	BuildWater(XMVectorSet(0.f, 0.f, -22.5f, 0.f), XMVectorSet(0.98f, 1.f, 0.5f, 0.f));
 	BuildHospital(XMVectorSet(-5.f, 1.f, 12.f, 0.f));
-	//BuildFourBuildings(XMVectorSet(-11.f, 5.f, 5.f, 0.f));
-	//BuildWaterBuilding(XMVectorSet(-10.f, 1.5f, -11.f, 0.f));
-	//BuildTwoBuildings(XMVectorSet(5.f, 5.f, 12.f, 0.f));
-	//BuildStrangeBuildings(XMVectorSet(12.f, 2.f, 2.f, 0.f));
-	//BuildSquareBuilding(XMVectorSet(12.f, 2.f, -11.f, 0.f));
-	//Tower(XMVectorSet(0.f, 0.f, -4.f, 0.f));
-	//Park(XMVectorSet(0.f, 0.f, -4.f, 0.f));
-	//Barrigates(XMVectorSet(0.f, 0.7f, 0.f, 0.f));
+	BuildFourBuildings(XMVectorSet(-11.f, 5.f, 5.f, 0.f));
+	BuildWaterBuilding(XMVectorSet(-10.f, 1.5f, -11.f, 0.f));
+	BuildTwoBuildings(XMVectorSet(5.f, 5.f, 12.f, 0.f));
+	BuildStrangeBuildings(XMVectorSet(12.f, 2.f, 2.f, 0.f));
+	BuildSquareBuilding(XMVectorSet(12.f, 2.f, -11.f, 0.f));
+	Tower(XMVectorSet(0.f, 0.f, -4.f, 0.f));
+	Park(XMVectorSet(0.f, 0.f, -4.f, 0.f));
+	Barrigates(XMVectorSet(0.f, 0.7f, 0.f, 0.f));
 
 
-	//BuildTree(XMVectorSet(-4.f, 0.9f, 0.f, 0.f));
-	//BuildTree(XMVectorSet(-4.f, 0.9f, 3.f, 0.f));
-	//BuildTree(XMVectorSet(-1.f, 0.9f, 3.f, 0.f));
+	BuildTree(XMVectorSet(-4.f, 0.9f, 0.f, 0.f));
+	BuildTree(XMVectorSet(-4.f, 0.9f, 3.f, 0.f));
+	BuildTree(XMVectorSet(-1.f, 0.9f, 3.f, 0.f));
 
-	//BuildTree(XMVectorSet(2.f, 0.9f, -10.f, 0.f));
-	//BuildTree(XMVectorSet(2.f, 0.9f, -7.f, 0.f));
-	//BuildTree(XMVectorSet(5.f, 0.9f, -7.f, 0.f));
+	BuildTree(XMVectorSet(2.f, 0.9f, -10.f, 0.f));
+	BuildTree(XMVectorSet(2.f, 0.9f, -7.f, 0.f));
+	BuildTree(XMVectorSet(5.f, 0.9f, -7.f, 0.f));
 
   /*  auto gridRitem = std::make_unique<RenderItem>();
     gridRitem->World = MathHelper::Identity4x4();
@@ -1523,6 +1595,7 @@ void TreeBillboardsApp::BuildGround(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR ro
 	ground->ObjCBIndex = mObjCBIndex++;
 	ground->Geo = mGeometries["shapeGeo"].get();
 	ground->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	ground->Bounds = ground->Geo->DrawArgs["grid"].Bounds;
 	ground->IndexCount = ground->Geo->DrawArgs["grid"].IndexCount;
 	ground->StartIndexLocation = ground->Geo->DrawArgs["grid"].StartIndexLocation;
 	ground->BaseVertexLocation = ground->Geo->DrawArgs["grid"].BaseVertexLocation;
@@ -1594,208 +1667,215 @@ void TreeBillboardsApp::BuildHospital(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR 
 	mAllRitems.push_back(std::move(mainBox));
 
 
-	////Top Box
-	//auto topBox = std::make_unique<RenderItem>();
+	//Top Box
+	auto topBox = std::make_unique<RenderItem>();
 
-	////Local
-	//XMStoreFloat4x4(&topBox->World, XMMatrixScaling(1.0f, 1.0f, 0.6f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, 0.2f));
+	//Local
+	XMStoreFloat4x4(&topBox->World, XMMatrixScaling(1.0f, 1.0f, 0.6f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, 0.2f));
 
-	////World
-	//XMStoreFloat4x4(&topBox->World,
-	//	XMLoadFloat4x4(&topBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
+	//World
+	XMStoreFloat4x4(&topBox->World,
+		XMLoadFloat4x4(&topBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
 
-	////Material
-	//topBox->Mat = mMaterials["White"].get();
+	//Material
+	topBox->Mat = mMaterials["White"].get();
 
-	////Texture Scaling
-	//XMStoreFloat4x4(&topBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	//Texture Scaling
+	XMStoreFloat4x4(&topBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 
-	//topBox->ObjCBIndex = mObjCBIndex++;
-	//topBox->Geo = mGeometries["shapeGeo"].get();
-	//topBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//topBox->IndexCount = topBox->Geo->DrawArgs["box"].IndexCount;
-	//topBox->StartIndexLocation = topBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//topBox->BaseVertexLocation = topBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(topBox.get());
-	//mAllRitems.push_back(std::move(topBox));
-
-
-	////Left BIg Box
-	//auto leftBigBox = std::make_unique<RenderItem>();
-
-	////Local
-	//XMStoreFloat4x4(&leftBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, 1.f, 0.3f));
-
-	////World
-	//XMStoreFloat4x4(&leftBigBox->World,
-	//	XMLoadFloat4x4(&leftBigBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
-
-	////Material
-	//leftBigBox->Mat = mMaterials["White"].get();
-
-	////Texture Scaling
-	//XMStoreFloat4x4(&leftBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
-
-	//leftBigBox->ObjCBIndex = mObjCBIndex++;
-	//leftBigBox->Geo = mGeometries["shapeGeo"].get();
-	//leftBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//leftBigBox->IndexCount = leftBigBox->Geo->DrawArgs["box"].IndexCount;
-	//leftBigBox->StartIndexLocation = leftBigBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//leftBigBox->BaseVertexLocation = leftBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(leftBigBox.get());
-	//mAllRitems.push_back(std::move(leftBigBox));
+	topBox->ObjCBIndex = mObjCBIndex++;
+	topBox->Geo = mGeometries["shapeGeo"].get();
+	topBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	topBox->Bounds = topBox->Geo->DrawArgs["box"].Bounds;
+	topBox->IndexCount = topBox->Geo->DrawArgs["box"].IndexCount;
+	topBox->StartIndexLocation = topBox->Geo->DrawArgs["box"].StartIndexLocation;
+	topBox->BaseVertexLocation = topBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(topBox.get());
+	mAllRitems.push_back(std::move(topBox));
 
 
-	////Right BIg Box
-	//auto rightBigBox = std::make_unique<RenderItem>();
+	//Left BIg Box
+	auto leftBigBox = std::make_unique<RenderItem>();
 
-	////Local
-	//XMStoreFloat4x4(&rightBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 1.f, 0.3f));
+	//Local
+	XMStoreFloat4x4(&leftBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, 1.f, 0.3f));
 
-	////World
-	//XMStoreFloat4x4(&rightBigBox->World,
-	//	XMLoadFloat4x4(&rightBigBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
+	//World
+	XMStoreFloat4x4(&leftBigBox->World,
+		XMLoadFloat4x4(&leftBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
 
-	////Material
-	//rightBigBox->Mat = mMaterials["White"].get();
+	//Material
+	leftBigBox->Mat = mMaterials["White"].get();
 
-	////Texture Scaling
-	//XMStoreFloat4x4(&rightBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	//Texture Scaling
+	XMStoreFloat4x4(&leftBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 
-	//rightBigBox->ObjCBIndex = mObjCBIndex++;
-	//rightBigBox->Geo = mGeometries["shapeGeo"].get();
-	//rightBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//rightBigBox->IndexCount = rightBigBox->Geo->DrawArgs["box"].IndexCount;
-	//rightBigBox->StartIndexLocation = rightBigBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//rightBigBox->BaseVertexLocation = rightBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(rightBigBox.get());
-	//mAllRitems.push_back(std::move(rightBigBox));
-
-
-	////left small Box
-	//auto leftSmallBox = std::make_unique<RenderItem>();
-
-	////Local
-	//XMStoreFloat4x4(&leftSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, -0.5f, -0.6f));
-
-	////World
-	//XMStoreFloat4x4(&leftSmallBox->World,
-	//	XMLoadFloat4x4(&leftSmallBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
-
-	////Material
-	//leftSmallBox->Mat = mMaterials["White"].get();
-
-	////Texture Scaling
-	//XMStoreFloat4x4(&leftSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
-
-	//leftSmallBox->ObjCBIndex = mObjCBIndex++;
-	//leftSmallBox->Geo = mGeometries["shapeGeo"].get();
-	//leftSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//leftSmallBox->IndexCount = leftSmallBox->Geo->DrawArgs["box"].IndexCount;
-	//leftSmallBox->StartIndexLocation = leftSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//leftSmallBox->BaseVertexLocation = leftSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(leftSmallBox.get());
-	//mAllRitems.push_back(std::move(leftSmallBox));
+	leftBigBox->ObjCBIndex = mObjCBIndex++;
+	leftBigBox->Geo = mGeometries["shapeGeo"].get();
+	leftBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftBigBox->Bounds = leftBigBox->Geo->DrawArgs["box"].Bounds;
+	leftBigBox->IndexCount = leftBigBox->Geo->DrawArgs["box"].IndexCount;
+	leftBigBox->StartIndexLocation = leftBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftBigBox->BaseVertexLocation = leftBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(leftBigBox.get());
+	mAllRitems.push_back(std::move(leftBigBox));
 
 
-	////right small Box
-	//auto rightSmallBox = std::make_unique<RenderItem>();
+	//Right BIg Box
+	auto rightBigBox = std::make_unique<RenderItem>();
 
-	////Local
-	//XMStoreFloat4x4(&rightSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, -0.5f, -0.6f));
+	//Local
+	XMStoreFloat4x4(&rightBigBox->World, XMMatrixScaling(1.0f, 4.0f, 0.7f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 1.f, 0.3f));
 
-	////World
-	//XMStoreFloat4x4(&rightSmallBox->World,
-	//	XMLoadFloat4x4(&rightSmallBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
+	//World
+	XMStoreFloat4x4(&rightBigBox->World,
+		XMLoadFloat4x4(&rightBigBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
 
-	////Material
-	//rightSmallBox->Mat = mMaterials["White"].get();
+	//Material
+	rightBigBox->Mat = mMaterials["White"].get();
 
-	////Texture Scaling
-	//XMStoreFloat4x4(&rightSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	//Texture Scaling
+	XMStoreFloat4x4(&rightBigBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 
-
-	//rightSmallBox->ObjCBIndex = mObjCBIndex++;
-	//rightSmallBox->Geo = mGeometries["shapeGeo"].get();
-	//rightSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//rightSmallBox->IndexCount = rightSmallBox->Geo->DrawArgs["box"].IndexCount;
-	//rightSmallBox->StartIndexLocation = rightSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//rightSmallBox->BaseVertexLocation = rightSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(rightSmallBox.get());
-	//mAllRitems.push_back(std::move(rightSmallBox));
-
-
-	////Cross Vertical Box
-	//auto crossVerticalBox = std::make_unique<RenderItem>();
-
-	////Local
-	//XMStoreFloat4x4(&crossVerticalBox->World, XMMatrixScaling(0.7f, 0.2f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
-
-	////World
-	//XMStoreFloat4x4(&crossVerticalBox->World,
-	//	XMLoadFloat4x4(&crossVerticalBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
-
-	////Material
-	//crossVerticalBox->Mat = mMaterials["redBrick"].get();
-
-	////Texture Scaling
-	//XMStoreFloat4x4(&crossVerticalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
-
-	//crossVerticalBox->ObjCBIndex = mObjCBIndex++;
-	//crossVerticalBox->Geo = mGeometries["shapeGeo"].get();
-	//crossVerticalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//crossVerticalBox->IndexCount = crossVerticalBox->Geo->DrawArgs["box"].IndexCount;
-	//crossVerticalBox->StartIndexLocation = crossVerticalBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//crossVerticalBox->BaseVertexLocation = crossVerticalBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(crossVerticalBox.get());
-	//mAllRitems.push_back(std::move(crossVerticalBox));
+	rightBigBox->ObjCBIndex = mObjCBIndex++;
+	rightBigBox->Geo = mGeometries["shapeGeo"].get();
+	rightBigBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightBigBox->Bounds = rightBigBox->Geo->DrawArgs["box"].Bounds;
+	rightBigBox->IndexCount = rightBigBox->Geo->DrawArgs["box"].IndexCount;
+	rightBigBox->StartIndexLocation = rightBigBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightBigBox->BaseVertexLocation = rightBigBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(rightBigBox.get());
+	mAllRitems.push_back(std::move(rightBigBox));
 
 
-	////Cross Horizontal Box
-	//auto crossHorizontalBox = std::make_unique<RenderItem>();
+	//left small Box
+	auto leftSmallBox = std::make_unique<RenderItem>();
 
-	////Local
-	//XMStoreFloat4x4(&crossHorizontalBox->World, XMMatrixScaling(0.2f, 0.7f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+	//Local
+	XMStoreFloat4x4(&leftSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(-2.0f, -0.5f, -0.6f));
 
-	////World
-	//XMStoreFloat4x4(&crossHorizontalBox->World,
-	//	XMLoadFloat4x4(&crossHorizontalBox->World) *
-	//	XMMatrixScalingFromVector(scale) *
-	//	XMMatrixRotationRollPitchYawFromVector(rotation) *
-	//	XMMatrixTranslationFromVector(pos));
+	//World
+	XMStoreFloat4x4(&leftSmallBox->World,
+		XMLoadFloat4x4(&leftSmallBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
 
-	////Material
-	//crossHorizontalBox->Mat = mMaterials["redBrick"].get();
+	//Material
+	leftSmallBox->Mat = mMaterials["White"].get();
 
-	////Texture Scaling
-	//XMStoreFloat4x4(&crossHorizontalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+	//Texture Scaling
+	XMStoreFloat4x4(&leftSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
 
-	//crossHorizontalBox->ObjCBIndex = mObjCBIndex++;
-	//crossHorizontalBox->Geo = mGeometries["shapeGeo"].get();
-	//crossHorizontalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	//crossHorizontalBox->IndexCount = crossHorizontalBox->Geo->DrawArgs["box"].IndexCount;
-	//crossHorizontalBox->StartIndexLocation = crossHorizontalBox->Geo->DrawArgs["box"].StartIndexLocation;
-	//crossHorizontalBox->BaseVertexLocation = crossHorizontalBox->Geo->DrawArgs["box"].BaseVertexLocation;
-	//mRitemLayer[(int)RenderLayer::Opaque].push_back(crossHorizontalBox.get());
-	//mAllRitems.push_back(std::move(crossHorizontalBox));
+	leftSmallBox->ObjCBIndex = mObjCBIndex++;
+	leftSmallBox->Geo = mGeometries["shapeGeo"].get();
+	leftSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	leftSmallBox->Bounds = leftSmallBox->Geo->DrawArgs["box"].Bounds;
+	leftSmallBox->IndexCount = leftSmallBox->Geo->DrawArgs["box"].IndexCount;
+	leftSmallBox->StartIndexLocation = leftSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	leftSmallBox->BaseVertexLocation = leftSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(leftSmallBox.get());
+	mAllRitems.push_back(std::move(leftSmallBox));
+
+
+	//right small Box
+	auto rightSmallBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&rightSmallBox->World, XMMatrixScaling(1.0f, 1.0f, 1.f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, -0.5f, -0.6f));
+
+	//World
+	XMStoreFloat4x4(&rightSmallBox->World,
+		XMLoadFloat4x4(&rightSmallBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	rightSmallBox->Mat = mMaterials["White"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&rightSmallBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+
+	rightSmallBox->ObjCBIndex = mObjCBIndex++;
+	rightSmallBox->Geo = mGeometries["shapeGeo"].get();
+	rightSmallBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rightSmallBox->Bounds = rightSmallBox->Geo->DrawArgs["box"].Bounds;
+	rightSmallBox->IndexCount = rightSmallBox->Geo->DrawArgs["box"].IndexCount;
+	rightSmallBox->StartIndexLocation = rightSmallBox->Geo->DrawArgs["box"].StartIndexLocation;
+	rightSmallBox->BaseVertexLocation = rightSmallBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(rightSmallBox.get());
+	mAllRitems.push_back(std::move(rightSmallBox));
+
+
+	//Cross Vertical Box
+	auto crossVerticalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossVerticalBox->World, XMMatrixScaling(0.7f, 0.2f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossVerticalBox->World,
+		XMLoadFloat4x4(&crossVerticalBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	crossVerticalBox->Mat = mMaterials["redBrick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&crossVerticalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	crossVerticalBox->ObjCBIndex = mObjCBIndex++;
+	crossVerticalBox->Geo = mGeometries["shapeGeo"].get();
+	crossVerticalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossVerticalBox->Bounds = crossVerticalBox->Geo->DrawArgs["box"].Bounds;
+	crossVerticalBox->IndexCount = crossVerticalBox->Geo->DrawArgs["box"].IndexCount;
+	crossVerticalBox->StartIndexLocation = crossVerticalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossVerticalBox->BaseVertexLocation = crossVerticalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(crossVerticalBox.get());
+	mAllRitems.push_back(std::move(crossVerticalBox));
+
+
+	//Cross Horizontal Box
+	auto crossHorizontalBox = std::make_unique<RenderItem>();
+
+	//Local
+	XMStoreFloat4x4(&crossHorizontalBox->World, XMMatrixScaling(0.2f, 0.7f, 0.1f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.5f, -0.1f));
+
+	//World
+	XMStoreFloat4x4(&crossHorizontalBox->World,
+		XMLoadFloat4x4(&crossHorizontalBox->World) *
+		XMMatrixScalingFromVector(scale) *
+		XMMatrixRotationRollPitchYawFromVector(rotation) *
+		XMMatrixTranslationFromVector(pos));
+
+	//Material
+	crossHorizontalBox->Mat = mMaterials["redBrick"].get();
+
+	//Texture Scaling
+	XMStoreFloat4x4(&crossHorizontalBox->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+
+	crossHorizontalBox->ObjCBIndex = mObjCBIndex++;
+	crossHorizontalBox->Geo = mGeometries["shapeGeo"].get();
+	crossHorizontalBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	crossHorizontalBox->Bounds = crossHorizontalBox->Geo->DrawArgs["box"].Bounds;
+	crossHorizontalBox->IndexCount = crossHorizontalBox->Geo->DrawArgs["box"].IndexCount;
+	crossHorizontalBox->StartIndexLocation = crossHorizontalBox->Geo->DrawArgs["box"].StartIndexLocation;
+	crossHorizontalBox->BaseVertexLocation = crossHorizontalBox->Geo->DrawArgs["box"].BaseVertexLocation;
+	mRitemLayer[(int)RenderLayer::Opaque].push_back(crossHorizontalBox.get());
+	mAllRitems.push_back(std::move(crossHorizontalBox));
 }
 
 void TreeBillboardsApp::BuildTree(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
@@ -1854,6 +1934,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["box"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -1884,6 +1965,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	secondBuilding->ObjCBIndex = mObjCBIndex++;
 	secondBuilding->Geo = mGeometries["shapeGeo"].get();
 	secondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	secondBuilding->Bounds = secondBuilding->Geo->DrawArgs["box"].Bounds;
 	secondBuilding->IndexCount = secondBuilding->Geo->DrawArgs["box"].IndexCount;
 	secondBuilding->StartIndexLocation = secondBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	secondBuilding->BaseVertexLocation = secondBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -1896,7 +1978,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	auto thirdBuilding = std::make_unique<RenderItem>();
 
 	//Local
-	XMStoreFloat4x4(&thirdBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 0.f, 0.0f));
+	XMStoreFloat4x4(&thirdBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(3.0f, 0.f, 0.0f));
 
 	//World
 	XMStoreFloat4x4(&thirdBuilding->World,
@@ -1914,6 +1996,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	thirdBuilding->ObjCBIndex = mObjCBIndex++;
 	thirdBuilding->Geo = mGeometries["shapeGeo"].get();
 	thirdBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	thirdBuilding->Bounds = thirdBuilding->Geo->DrawArgs["box"].Bounds;
 	thirdBuilding->IndexCount = thirdBuilding->Geo->DrawArgs["box"].IndexCount;
 	thirdBuilding->StartIndexLocation = thirdBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	thirdBuilding->BaseVertexLocation = thirdBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -1925,7 +2008,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	auto fourthBuilding = std::make_unique<RenderItem>();
 
 	//Local
-	XMStoreFloat4x4(&fourthBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 0.f, -5.0f));
+	XMStoreFloat4x4(&fourthBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(3.0f, 0.f, -5.0f));
 
 	//World
 	XMStoreFloat4x4(&fourthBuilding->World,
@@ -1943,6 +2026,7 @@ void TreeBillboardsApp::BuildFourBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	fourthBuilding->ObjCBIndex = mObjCBIndex++;
 	fourthBuilding->Geo = mGeometries["shapeGeo"].get();
 	fourthBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	fourthBuilding->Bounds = fourthBuilding->Geo->DrawArgs["box"].Bounds;
 	fourthBuilding->IndexCount = fourthBuilding->Geo->DrawArgs["box"].IndexCount;
 	fourthBuilding->StartIndexLocation = fourthBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	fourthBuilding->BaseVertexLocation = fourthBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -1974,6 +2058,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	mainBox->ObjCBIndex = mObjCBIndex++;
 	mainBox->Geo = mGeometries["shapeGeo"].get();
 	mainBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	mainBox->Bounds = mainBox->Geo->DrawArgs["box"].Bounds;
 	mainBox->IndexCount = mainBox->Geo->DrawArgs["box"].IndexCount;
 	mainBox->StartIndexLocation = mainBox->Geo->DrawArgs["box"].StartIndexLocation;
 	mainBox->BaseVertexLocation = mainBox->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2003,6 +2088,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	upperBox->ObjCBIndex = mObjCBIndex++;
 	upperBox->Geo = mGeometries["shapeGeo"].get();
 	upperBox->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	upperBox->Bounds = upperBox->Geo->DrawArgs["box"].Bounds;
 	upperBox->IndexCount = upperBox->Geo->DrawArgs["box"].IndexCount;
 	upperBox->StartIndexLocation = upperBox->Geo->DrawArgs["box"].StartIndexLocation;
 	upperBox->BaseVertexLocation = upperBox->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2033,6 +2119,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	door->ObjCBIndex = mObjCBIndex++;
 	door->Geo = mGeometries["shapeGeo"].get();
 	door->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	door->Bounds = door->Geo->DrawArgs["box"].Bounds;
 	door->IndexCount = door->Geo->DrawArgs["box"].IndexCount;
 	door->StartIndexLocation = door->Geo->DrawArgs["box"].StartIndexLocation;
 	door->BaseVertexLocation = door->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2062,6 +2149,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	bridge->ObjCBIndex = mObjCBIndex++;
 	bridge->Geo = mGeometries["shapeGeo"].get();
 	bridge->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	bridge->Bounds = bridge->Geo->DrawArgs["box"].Bounds;
 	bridge->IndexCount = bridge->Geo->DrawArgs["box"].IndexCount;
 	bridge->StartIndexLocation = bridge->Geo->DrawArgs["box"].StartIndexLocation;
 	bridge->BaseVertexLocation = bridge->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2091,6 +2179,7 @@ void TreeBillboardsApp::BuildWaterBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMVE
 	woodGround->ObjCBIndex = mObjCBIndex++;
 	woodGround->Geo = mGeometries["shapeGeo"].get();
 	woodGround->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	woodGround->Bounds = woodGround->Geo->DrawArgs["box"].Bounds;
 	woodGround->IndexCount = woodGround->Geo->DrawArgs["box"].IndexCount;
 	woodGround->StartIndexLocation = woodGround->Geo->DrawArgs["box"].StartIndexLocation;
 	woodGround->BaseVertexLocation = woodGround->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2122,6 +2211,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["box"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2132,7 +2222,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 	auto secondBuilding = std::make_unique<RenderItem>();
 
 	//Local
-	XMStoreFloat4x4(&secondBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(2.0f, 0.f, 0.0f));
+	XMStoreFloat4x4(&secondBuilding->World, XMMatrixScaling(2.0f, 10.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(3.0f, 0.f, 0.0f));
 
 	//World
 	XMStoreFloat4x4(&secondBuilding->World,
@@ -2150,6 +2240,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 	secondBuilding->ObjCBIndex = mObjCBIndex++;
 	secondBuilding->Geo = mGeometries["shapeGeo"].get();
 	secondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	secondBuilding->Bounds = secondBuilding->Geo->DrawArgs["box"].Bounds;
 	secondBuilding->IndexCount = secondBuilding->Geo->DrawArgs["box"].IndexCount;
 	secondBuilding->StartIndexLocation = secondBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	secondBuilding->BaseVertexLocation = secondBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2161,7 +2252,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 	auto bridge = std::make_unique<RenderItem>();
 
 	//Local
-	XMStoreFloat4x4(&bridge->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 1.f, 0.0f));
+	XMStoreFloat4x4(&bridge->World, XMMatrixScaling(3.0f, 2.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.5f, 1.f, 0.0f));
 
 	//World
 	XMStoreFloat4x4(&bridge->World,
@@ -2179,6 +2270,7 @@ void TreeBillboardsApp::BuildTwoBuildings(FXMVECTOR pos, FXMVECTOR scale, FXMVEC
 	bridge->ObjCBIndex = mObjCBIndex++;
 	bridge->Geo = mGeometries["shapeGeo"].get();
 	bridge->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	bridge->Bounds = bridge->Geo->DrawArgs["box"].Bounds;
 	bridge->IndexCount = bridge->Geo->DrawArgs["box"].IndexCount;
 	bridge->StartIndexLocation = bridge->Geo->DrawArgs["box"].StartIndexLocation;
 	bridge->BaseVertexLocation = bridge->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2210,6 +2302,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["box"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2238,6 +2331,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 	secondFloor->ObjCBIndex = mObjCBIndex++;
 	secondFloor->Geo = mGeometries["shapeGeo"].get();
 	secondFloor->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	secondFloor->Bounds = secondFloor->Geo->DrawArgs["box"].Bounds;
 	secondFloor->IndexCount = secondFloor->Geo->DrawArgs["box"].IndexCount;
 	secondFloor->StartIndexLocation = secondFloor->Geo->DrawArgs["box"].StartIndexLocation;
 	secondFloor->BaseVertexLocation = secondFloor->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2266,6 +2360,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 	thirdFloor->ObjCBIndex = mObjCBIndex++;
 	thirdFloor->Geo = mGeometries["shapeGeo"].get();
 	thirdFloor->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	thirdFloor->Bounds = thirdFloor->Geo->DrawArgs["box"].Bounds;
 	thirdFloor->IndexCount = thirdFloor->Geo->DrawArgs["box"].IndexCount;
 	thirdFloor->StartIndexLocation = thirdFloor->Geo->DrawArgs["box"].StartIndexLocation;
 	thirdFloor->BaseVertexLocation = thirdFloor->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2294,6 +2389,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 	fourthFloor->ObjCBIndex = mObjCBIndex++;
 	fourthFloor->Geo = mGeometries["shapeGeo"].get();
 	fourthFloor->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	fourthFloor->Bounds = fourthFloor->Geo->DrawArgs["box"].Bounds;
 	fourthFloor->IndexCount = fourthFloor->Geo->DrawArgs["box"].IndexCount;
 	fourthFloor->StartIndexLocation = fourthFloor->Geo->DrawArgs["box"].StartIndexLocation;
 	fourthFloor->BaseVertexLocation = fourthFloor->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2322,6 +2418,7 @@ void TreeBillboardsApp::BuildStrangeBuildings(FXMVECTOR pos, FXMVECTOR scale, FX
 	longFloor->ObjCBIndex = mObjCBIndex++;
 	longFloor->Geo = mGeometries["shapeGeo"].get();
 	longFloor->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	longFloor->Bounds = longFloor->Geo->DrawArgs["box"].Bounds;
 	longFloor->IndexCount = longFloor->Geo->DrawArgs["box"].IndexCount;
 	longFloor->StartIndexLocation = longFloor->Geo->DrawArgs["box"].StartIndexLocation;
 	longFloor->BaseVertexLocation = longFloor->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2353,6 +2450,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["box"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["box"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["box"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2381,6 +2479,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco1->ObjCBIndex = mObjCBIndex++;
 	deco1->Geo = mGeometries["shapeGeo"].get();
 	deco1->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco1->Bounds = deco1->Geo->DrawArgs["box"].Bounds;
 	deco1->IndexCount = deco1->Geo->DrawArgs["box"].IndexCount;
 	deco1->StartIndexLocation = deco1->Geo->DrawArgs["box"].StartIndexLocation;
 	deco1->BaseVertexLocation = deco1->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2410,6 +2509,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco2->ObjCBIndex = mObjCBIndex++;
 	deco2->Geo = mGeometries["shapeGeo"].get();
 	deco2->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco2->Bounds = deco2->Geo->DrawArgs["box"].Bounds;
 	deco2->IndexCount = deco2->Geo->DrawArgs["box"].IndexCount;
 	deco2->StartIndexLocation = deco2->Geo->DrawArgs["box"].StartIndexLocation;
 	deco2->BaseVertexLocation = deco2->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2438,6 +2538,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco3->ObjCBIndex = mObjCBIndex++;
 	deco3->Geo = mGeometries["shapeGeo"].get();
 	deco3->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco3->Bounds = deco3->Geo->DrawArgs["box"].Bounds;
 	deco3->IndexCount = deco3->Geo->DrawArgs["box"].IndexCount;
 	deco3->StartIndexLocation = deco3->Geo->DrawArgs["box"].StartIndexLocation;
 	deco3->BaseVertexLocation = deco3->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2466,6 +2567,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco4->ObjCBIndex = mObjCBIndex++;
 	deco4->Geo = mGeometries["shapeGeo"].get();
 	deco4->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco4->Bounds = deco4->Geo->DrawArgs["box"].Bounds;
 	deco4->IndexCount = deco4->Geo->DrawArgs["box"].IndexCount;
 	deco4->StartIndexLocation = deco4->Geo->DrawArgs["box"].StartIndexLocation;
 	deco4->BaseVertexLocation = deco4->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2494,6 +2596,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco5->ObjCBIndex = mObjCBIndex++;
 	deco5->Geo = mGeometries["shapeGeo"].get();
 	deco5->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco5->Bounds = deco5->Geo->DrawArgs["box"].Bounds;
 	deco5->IndexCount = deco5->Geo->DrawArgs["box"].IndexCount;
 	deco5->StartIndexLocation = deco5->Geo->DrawArgs["box"].StartIndexLocation;
 	deco5->BaseVertexLocation = deco5->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2522,6 +2625,7 @@ void TreeBillboardsApp::BuildSquareBuilding(FXMVECTOR pos, FXMVECTOR scale, FXMV
 	deco6->ObjCBIndex = mObjCBIndex++;
 	deco6->Geo = mGeometries["shapeGeo"].get();
 	deco6->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	deco6->Bounds = deco6->Geo->DrawArgs["box"].Bounds;
 	deco6->IndexCount = deco6->Geo->DrawArgs["box"].IndexCount;
 	deco6->StartIndexLocation = deco6->Geo->DrawArgs["box"].StartIndexLocation;
 	deco6->BaseVertexLocation = deco6->Geo->DrawArgs["box"].BaseVertexLocation;
@@ -2537,6 +2641,7 @@ void TreeBillboardsApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation
 
 	//Local
 	XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(2.0f, 8.0f, 2.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 12.f, 0.0f));
+	//XMStoreFloat4x4(&firstBuilding->World, XMMatrixScaling(1.0f, 1.0f, 1.0f) * XMMatrixRotationRollPitchYaw(0.f, 0.f, 0.f) * XMMatrixTranslation(0.0f, 0.f, 0.0f));
 
 	//World
 	XMStoreFloat4x4(&firstBuilding->World,
@@ -2554,6 +2659,7 @@ void TreeBillboardsApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2582,6 +2688,7 @@ void TreeBillboardsApp::Tower(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation
 	SecondBuilding->ObjCBIndex = mObjCBIndex++;
 	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
 	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->Bounds = SecondBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2613,6 +2720,7 @@ void TreeBillboardsApp::Park(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2641,6 +2749,7 @@ void TreeBillboardsApp::Park(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rotation)
 	SecondBuilding->ObjCBIndex = mObjCBIndex++;
 	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
 	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->Bounds = SecondBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2675,6 +2784,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	firstBuilding->ObjCBIndex = mObjCBIndex++;
 	firstBuilding->Geo = mGeometries["shapeGeo"].get();
 	firstBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	firstBuilding->Bounds = firstBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	firstBuilding->IndexCount = firstBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	firstBuilding->StartIndexLocation = firstBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	firstBuilding->BaseVertexLocation = firstBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2703,6 +2813,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	SecondBuilding->ObjCBIndex = mObjCBIndex++;
 	SecondBuilding->Geo = mGeometries["shapeGeo"].get();
 	SecondBuilding->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	SecondBuilding->Bounds = SecondBuilding->Geo->DrawArgs["cylinder"].Bounds;
 	SecondBuilding->IndexCount = SecondBuilding->Geo->DrawArgs["cylinder"].IndexCount;
 	SecondBuilding->StartIndexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	SecondBuilding->BaseVertexLocation = SecondBuilding->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2731,6 +2842,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Third->ObjCBIndex = mObjCBIndex++;
 	Third->Geo = mGeometries["shapeGeo"].get();
 	Third->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Third->Bounds = Third->Geo->DrawArgs["cylinder"].Bounds;
 	Third->IndexCount = Third->Geo->DrawArgs["cylinder"].IndexCount;
 	Third->StartIndexLocation = Third->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Third->BaseVertexLocation = Third->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2759,6 +2871,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Fourth->ObjCBIndex = mObjCBIndex++;
 	Fourth->Geo = mGeometries["shapeGeo"].get();
 	Fourth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Fourth->Bounds = Fourth->Geo->DrawArgs["cylinder"].Bounds;
 	Fourth->IndexCount = Fourth->Geo->DrawArgs["cylinder"].IndexCount;
 	Fourth->StartIndexLocation = Fourth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Fourth->BaseVertexLocation = Fourth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2787,6 +2900,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Fifth->ObjCBIndex = mObjCBIndex++;
 	Fifth->Geo = mGeometries["shapeGeo"].get();
 	Fifth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Fifth->Bounds = Fifth->Geo->DrawArgs["cylinder"].Bounds;
 	Fifth->IndexCount = Fifth->Geo->DrawArgs["cylinder"].IndexCount;
 	Fifth->StartIndexLocation = Fifth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Fifth->BaseVertexLocation = Fifth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2815,6 +2929,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Sisth->ObjCBIndex = mObjCBIndex++;
 	Sisth->Geo = mGeometries["shapeGeo"].get();
 	Sisth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Sisth->Bounds = Sisth->Geo->DrawArgs["cylinder"].Bounds;
 	Sisth->IndexCount = Sisth->Geo->DrawArgs["cylinder"].IndexCount;
 	Sisth->StartIndexLocation = Sisth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Sisth->BaseVertexLocation = Sisth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2843,6 +2958,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Seventh->ObjCBIndex = mObjCBIndex++;
 	Seventh->Geo = mGeometries["shapeGeo"].get();
 	Seventh->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Seventh->Bounds = Seventh->Geo->DrawArgs["cylinder"].Bounds;
 	Seventh->IndexCount = Seventh->Geo->DrawArgs["cylinder"].IndexCount;
 	Seventh->StartIndexLocation = Seventh->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Seventh->BaseVertexLocation = Seventh->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2871,6 +2987,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Eighth->ObjCBIndex = mObjCBIndex++;
 	Eighth->Geo = mGeometries["shapeGeo"].get();
 	Eighth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Eighth->Bounds = Eighth->Geo->DrawArgs["cylinder"].Bounds;
 	Eighth->IndexCount = Eighth->Geo->DrawArgs["cylinder"].IndexCount;
 	Eighth->StartIndexLocation = Eighth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Eighth->BaseVertexLocation = Eighth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2899,6 +3016,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Nineth->ObjCBIndex = mObjCBIndex++;
 	Nineth->Geo = mGeometries["shapeGeo"].get();
 	Nineth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Nineth->Bounds = Nineth->Geo->DrawArgs["cylinder"].Bounds;
 	Nineth->IndexCount = Nineth->Geo->DrawArgs["cylinder"].IndexCount;
 	Nineth->StartIndexLocation = Nineth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Nineth->BaseVertexLocation = Nineth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2927,6 +3045,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Tenth->ObjCBIndex = mObjCBIndex++;
 	Tenth->Geo = mGeometries["shapeGeo"].get();
 	Tenth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Tenth->Bounds = Tenth->Geo->DrawArgs["cylinder"].Bounds;
 	Tenth->IndexCount = Tenth->Geo->DrawArgs["cylinder"].IndexCount;
 	Tenth->StartIndexLocation = Tenth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Tenth->BaseVertexLocation = Tenth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2955,6 +3074,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Eleventh->ObjCBIndex = mObjCBIndex++;
 	Eleventh->Geo = mGeometries["shapeGeo"].get();
 	Eleventh->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Eleventh->Bounds = Eleventh->Geo->DrawArgs["cylinder"].Bounds;
 	Eleventh->IndexCount = Eleventh->Geo->DrawArgs["cylinder"].IndexCount;
 	Eleventh->StartIndexLocation = Eleventh->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Eleventh->BaseVertexLocation = Eleventh->Geo->DrawArgs["cylinder"].BaseVertexLocation;
@@ -2983,6 +3103,7 @@ void TreeBillboardsApp::Barrigates(FXMVECTOR pos, FXMVECTOR scale, FXMVECTOR rot
 	Twelveth->ObjCBIndex = mObjCBIndex++;
 	Twelveth->Geo = mGeometries["shapeGeo"].get();
 	Twelveth->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	Twelveth->Bounds = Twelveth->Geo->DrawArgs["cylinder"].Bounds;
 	Twelveth->IndexCount = Twelveth->Geo->DrawArgs["cylinder"].IndexCount;
 	Twelveth->StartIndexLocation = Twelveth->Geo->DrawArgs["cylinder"].StartIndexLocation;
 	Twelveth->BaseVertexLocation = Twelveth->Geo->DrawArgs["cylinder"].BaseVertexLocation;
