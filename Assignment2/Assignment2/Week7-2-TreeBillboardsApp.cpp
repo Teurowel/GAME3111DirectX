@@ -237,7 +237,7 @@ bool TreeBillboardsApp::Initialize()
 	// so we have to query this information.
     mCbvSrvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	mCamera.SetPosition(0.f, 5.0f, -40.0f);
+	mCamera.SetPosition(-5.f, 3.0f, -10.0f);
 	mCameraBoundbox.Center = mCamera.GetPosition3f();
 	mCameraBoundbox.Extents = XMFLOAT3(1.1f, 1.1f, 1.1f);
 
