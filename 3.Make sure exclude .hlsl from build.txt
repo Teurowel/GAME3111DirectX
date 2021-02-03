@@ -1,0 +1,2 @@
+.hlsl files(shader files) should be excluded from build
+Right click .hlsl -> properties -> General -> Excluded From Build -> Yes

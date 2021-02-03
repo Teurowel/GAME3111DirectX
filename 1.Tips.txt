@@ -1,0 +1,13 @@
+////////////////////////How to make new project/////////////////////////////////
+Visual studio -> new project -> Windows Desktop Wizard(C++) -> Create -> Application Type -> Desktop Application -> Empty project -> OK
+project folder should be with Common folder and Textures folder
+copy Shader folder and other files into folder where .vcxproj in
+
+open project -> add existing files -> all files in Common -> copied with files with Shader folder
+
+***after add shader files(VS.hlsl or PS.hlsl which divided to two files), make sure to set it properly, Check How to compile HLSL.txt
+***if you have .hlsl which have VS and PS together, just exclude it from files, Check Make sure exclude .hlsl from build.txt
+
+////////////////////////Textures/////////////////////////////////
+LoadTextures : Actually load from file path and store texture information in unorderd_map
+BuildDescriptorHeaps : Make SrvDescriptorHeap which store texture information on GPU, we need to assign every texture in this SrvDescriptorHeap
