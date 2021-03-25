@@ -11,3 +11,7 @@ open project -> add existing files -> all files in Common -> copied with files w
 ////////////////////////Textures/////////////////////////////////
 LoadTextures : Actually load from file path and store texture information in unorderd_map
 BuildDescriptorHeaps : Make SrvDescriptorHeap which store texture information on GPU, we need to assign every texture in this SrvDescriptorHeap
+
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE(Descriptor) : contain information for one texture
+D3D12_DESCRIPTOR_HEAP_DESC(DescriptorHeap) : buffer for descriptor
